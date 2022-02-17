@@ -14,18 +14,13 @@ import numpy as np
 from scipy.stats import spearmanr,pearsonr
 import seaborn as sns
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import matplotlib as mpl
 from collections import defaultdict
 import os
 import itertools
 import logging
-from Bio import SeqIO
 import pickle
 import statistics
-import scipy
-from sklearn.cluster import KMeans
-import category_encoders
 import warnings
 warnings.filterwarnings('ignore')
 mpl.rcParams['figure.dpi'] = 300
@@ -176,7 +171,7 @@ parser = MyParser(usage='python %(prog)s [options]',formatter_class=argparse.Raw
                   '''))
 parser.add_argument("-training", type=str, default=None, help="Dataset for training. Count starts from 0. If None,then all input datasets")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
-parser.add_argument("-c", "--choice", default=None, help="If train on simplified random-effect model with CAI values, -c CAI. default: None")
+parser.add_argument("-c", "--choice", default="", help="If train on simplified random-effect model with CAI values, -c CAI. default: None")
 parser.add_argument("-s", "--split", default='guide', help="default: guide")
 args = parser.parse_args()
 training_sets=args.training
