@@ -14,7 +14,6 @@ import itertools
 import os
 import time 
 import seaborn as sns
-import logging
 import pandas
 import sklearn.model_selection
 import sklearn.metrics
@@ -22,23 +21,7 @@ import autosklearn
 import autosklearn.metrics
 import autosklearn.regression
 from scipy.stats import spearmanr,pearsonr
-# from sklearn.cluster import KMeans,FeatureAgglomeration
-# from sklearn.feature_selection import VarianceThreshold,GenericUnivariateSelect,f_regression
-# from sklearn.impute import SimpleImputer
-# from sklearn.preprocessing import StandardScaler,Normalizer,RobustScaler,MinMaxScaler
-# from collections import defaultdict
-# import shap
 import sys
-import textwrap
-# import pickle
-# from scipy import sparse
-# from sklearn.compose import make_column_selector, ColumnTransformer
-# from sklearn.pipeline import Pipeline
-# from autosklearn.pipeline.implementations.SparseOneHotEncoder import SparseOneHotEncoder
-# from sklearn.preprocessing import OneHotEncoder
-# import autosklearn.pipeline.implementations.CategoryShift
-# from autosklearn.pipeline.implementations.MinorityCoalescer import MinorityCoalescer
-# from autosklearn.pipeline.components.data_preprocessing.minority_coalescense.no_coalescense import NoCoalescence
 start_time=time.time()
 nts=['A','T','C','G']
 items=list(itertools.product(nts,repeat=2))
@@ -49,29 +32,37 @@ class MyParser(argparse.ArgumentParser):
         self.print_help()
         sys.exit(2)
         
-parser = MyParser(usage='python %(prog)s datasets [options]',formatter_class=argparse.RawDescriptionHelpFormatter,description=textwrap.dedent('''\
-                  This is used to train regression models. 
-                  
-                  Example: python machine_learning_data_fusion.py Rousset_dataset.csv,Wang_dataset.csv
-                  '''))
-parser.add_argument("datasets", help="data csv file(s),multiple files separated by ','")
-parser.add_argument("-training", type=str, default=None, help="Dataset for training. Count starts from 0. If None,then all input datasets")
+parser = MyParser(usage='python %(prog)s datasets [options]',formatter_class=argparse.RawTextHelpFormatter,description="""
+This is used to optimize models with individual or fused datasets using auto-sklearn (tested version 0.10.0).
+
+ensemble_size, folds, per_run_time_limit, time_left_for_this_task, include_estimators, and include_preprocessors are parameters for auto-sklearn. More description please check the API of auto-sklearn (https://automl.github.io/auto-sklearn/master/api.html)
+
+Example: python CRISPRi_autosklearn.py -c only_seq
+                  """)
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
-parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
-parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.3")
-parser.add_argument("-c","--choice", type=str, default='all', help="If use all features or only sequence features (all/only_seq), default: all")
+parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
+parser.add_argument("-training", type=str, default='0,1,2', 
+                    help="""
+Which datasets to use: 
+    0: E75 Rousset
+    1: E18 Cui
+    2: Wang
+    0,1: E75 Rousset & E18 Cui
+    0,2: E75 Rousset & Wang
+    1,2: E18 Cui & Wang
+    0,1,2: all 3 datasets
+default: 0,1,2""")
 parser.add_argument("-e","--ensemble_size", type=int, default=1, help="Ensemble size, default: 1")
+parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-prt","--per_run_time_limit", type=int, default=360, help="per_run_time_limit (in second), default: 360")
 parser.add_argument("-ptt","--time_left_for_this_task", type=int, default=3600, help="time_left_for_this_task (in second), default: 3600")
 parser.add_argument("-inest","--include_estimators", type=str, default=None, help="estimators to be included in auto-sklearn. Multiple input separated by ','. If None, then include all. Default: None")
 parser.add_argument("-inprepro","--include_preprocessors", type=str, default=None, help="preprocessors to be included in auto-sklearn. Multiple input separated by ','. If None, then include all. Default: None")
 
 
-
 args = parser.parse_args()
 datasets=args.datasets
 training_sets=args.training
-choice=args.choice
 ensemble_size=args.ensemble_size
 per_run_time_limit=args.per_run_time_limit
 time_left_for_this_task=args.time_left_for_this_task
@@ -82,16 +73,11 @@ if include_estimators != None:
     include_estimators=include_estimators.split(',')
 if include_preprocessors != None:
     include_preprocessors=include_preprocessors.split(',')
-if ',' in datasets:
-    datasets=datasets.split(",")
-else:
-    datasets=[datasets]
 if training_sets != None:
     if ',' in training_sets:
         training_sets=[int(i) for i in training_sets.split(",")]
     else:
         training_sets=[int(training_sets)]
-    
 else:
     training_sets=range(len(datasets))
 output_file_name = args.output
@@ -110,6 +96,7 @@ except:
     else:
         print("Please input valid choice..\nAbort.")
         sys.exit()
+        
 def self_encode(sequence):
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
     nts=['A','T','C','G']
@@ -130,41 +117,25 @@ def dinucleotide(sequence):
         encoded[nt*len(nts)**2+dinucleotides.index(sequence[nt]+sequence[nt+1])]=1
     return encoded
 
-def ROC_plot(fpr,tpr,roc_auc_score,name):
-    plt.figure()
-    plt.plot(fpr, tpr, color='#1f77b4',
-             lw=2, label='ROC curve (area = %0.2f)' % roc_auc_score)
-    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.0])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.legend(loc="lower right")
-    plt.savefig(output_file_name+'/'+name+ '_ROC.png',dpi=300)
-    plt.close()
-
 def DataFrame_input(df,coding_strand=1):
     ###keep guides for essential genes
     logging_file= open(output_file_name + '/Output.txt','a')
     df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==coding_strand)]
     df=df.dropna()
-    print(df.shape)
     for i in list(set(list(df['geneid']))):
         df_gene=df[df['geneid']==i]
         for j in df_gene.index:
             df.at[j,'Nr_guide']=df_gene.shape[0]
-    df=df[df['Nr_guide']>=5]
-    print(df.shape)
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
+    df=df[df['Nr_guide']>=5]
+    
     sequences=list(dict.fromkeys(df['sequence']))
-    print(len(sequences))
-    # df['gene_expression_max']=np.log10(df['gene_expression_max']+0.01)
-    # df['gene_expression_min']=np.log10(df['gene_expression_min']+0.01)
+    y=np.array(df['log2FC'],dtype=float)
     ### one hot encoded sequence features
     PAM_encoded=[]
     sequence_encoded=[]
     dinucleotide_encoded=[]
-    y=np.array(df['log2FC'],dtype=float)
+    
     
     for i in df.index:
         PAM_encoded.append(self_encode(df['PAM'][i]))
@@ -200,17 +171,7 @@ def DataFrame_input(df,coding_strand=1):
     X=df.drop(['log2FC'],1)#activity_score
     dataset_col=np.array(X['dataset'],dtype=int)  
     headers=list(X.columns.values)
-    gene_features=['dataset','geneid',"gene_5","gene_strand","gene_GC_content","distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_length","gene_expression_min","gene_expression_max"]#
 
-    if choice=='only_guide':
-        headers=[item for item in headers if item not in gene_features]
-    elif choice=='add_distance':
-        headers=['distance_start_codon','distance_start_codon_perc']
-    elif choice=='add_MFE':
-        headers=['distance_start_codon','distance_start_codon_perc']+['MFE_hybrid_full','MFE_hybrid_seed','MFE_homodimer_guide','MFE_monomer_guide']
-    elif choice=='gene_seq':
-        headers=[item for item in headers if item in gene_features]
-        
     X=X[headers]
     ### feat_type for auto sklearn
     feat_type=[]
@@ -236,17 +197,11 @@ def DataFrame_input(df,coding_strand=1):
         for dint in dinucleotides:
             headers.append(dint+str(i+1)+str(i+2))
             sequence_headers.append(dint+str(i+1)+str(i+2))
-    if choice=='only_seq':
-        X=pandas.DataFrame(X,columns=headers)
-        feat_type=list()
-        X=X[sequence_headers]
-        headers=sequence_headers
     ###add one-hot encoded sequence features to feat_type
     for i in range(PAM_len*4+sequence_len*4+(dinucleotide_len-1)*4*4):
         feat_type.append('Categorical')
     
     X=pandas.DataFrame(data=X,columns=headers)
-    print(X.shape)
     logging_file.write("Number of features: %s\n" % len(headers))
     return X, y,feat_type, headers, guideids,sequences,dataset_col
 

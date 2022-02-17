@@ -1,13 +1,9 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Created on Thu Sep 17 17:35:49 2020
 
 @author: yanying
 """
-#%%
-import sys
-sys.path.append("/vol/projects/yyu/CRISPRi-ge/lib/python3.7/site-packages/numpy")
 import pandas
 from merf import MERF
 import sklearn.model_selection
@@ -28,6 +24,52 @@ warnings.filterwarnings('ignore')
 mpl.rcParams['figure.dpi'] = 300
 import time
 start=time.time()
+
+import argparse
+import sys
+class MyParser(argparse.ArgumentParser):
+    def error(self, message):
+        sys.stderr.write('error: %s\n' % message)
+        self.print_help()
+        sys.exit(2)
+parser = MyParser(usage='python %(prog)s datasets [options]',formatter_class=argparse.RawTextHelpFormatter,description="""
+                  Example: python machine_learning_MERF.py 
+                  """)
+parser.add_argument("-training", type=str, default='0,1,2', 
+                    help="""
+Which datasets to use: 
+    0: E75 Rousset
+    1: E18 Cui
+    2: Wang
+    0,1: E75 Rousset & E18 Cui
+    0,2: E75 Rousset & Wang
+    1,2: E18 Cui & Wang
+    0,1,2: all 3 datasets
+default: 0,1,2""")
+parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
+parser.add_argument("-c", "--choice", default="", help="If train on simplified random-effect model with CAI values, -c CAI. default: None")
+parser.add_argument("-s", "--split", default='guide', help="default: guide")
+args = parser.parse_args()
+training_sets=args.training
+split=args.split
+if training_sets != None:
+    if ',' in training_sets:
+        training_sets=[int(i) for i in training_sets.split(",")]
+    else:
+        training_sets=[int(training_sets)]
+    
+else:
+    training_sets=list(range(3))
+path=args.output
+choice=args.choice
+    
+if os.path.isdir(path)==False:
+    os.mkdir(path)
+logging_file= path+"/Log.txt"
+for handler in logging.root.handlers[:]:
+    logging.root.removeHandler(handler)
+logging.basicConfig(filename=logging_file,format='%(asctime)s - %(message)s', level=logging.INFO)
+
 
 def self_encode(sequence):
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
@@ -61,7 +103,7 @@ def DataFrame_input(df):
                 df.at[j,'median']=median
                 df.at[j,'std']=np.std(gene_df['log2FC'])
     if 'CAI' in choice:
-        cai=pandas.read_csv('/home/yanying/projects/crispri/seq/NC_000913.3_CAI_values.csv',sep='\t',index_col=0)
+        cai=pandas.read_csv('NC_000913.3_CAI_values.csv',sep='\t',index_col=0)
     for i in list(set(list(df['geneid']))):
         df_gene=df[df['geneid']==i]
         for j in df_gene.index:
@@ -160,44 +202,11 @@ def DataFrame_input(df):
     return X_gene,X_guide, y, gene_features,guide_features,guide_sequence_set,guideids,clusters,medians,cols,sequence_features,stds,nr_guides
 
 
-import argparse
-import sys
-import textwrap
-class MyParser(argparse.ArgumentParser):
-    def error(self, message):
-        sys.stderr.write('error: %s\n' % message)
-        self.print_help()
-        sys.exit(2)
-parser = MyParser(usage='python %(prog)s [options]',formatter_class=argparse.RawDescriptionHelpFormatter,description=textwrap.dedent('''\
-                  Example: python machine_learning_MERF.py 
-                  '''))
-parser.add_argument("-training", type=str, default=None, help="Dataset for training. Count starts from 0. If None,then all input datasets")
-parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
-parser.add_argument("-c", "--choice", default="", help="If train on simplified random-effect model with CAI values, -c CAI. default: None")
-parser.add_argument("-s", "--split", default='guide', help="default: guide")
-args = parser.parse_args()
-training_sets=args.training
-split=args.split
-if training_sets != None:
-    if ',' in training_sets:
-        training_sets=[int(i) for i in training_sets.split(",")]
-    else:
-        training_sets=[int(training_sets)]
-    
-else:
-    training_sets=list(range(3))
-path=args.output
-choice=args.choice
-    
-if os.path.isdir(path)==False:
-    os.mkdir(path)
-logging_file= path+"/Log.txt"
-for handler in logging.root.handlers[:]:
-    logging.root.removeHandler(handler)
-logging.basicConfig(filename=logging_file,format='%(asctime)s - %(message)s', level=logging.INFO)
 
 #data fusion
-datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
+datasets=['/vol/projects/yyu/CRISPRi-guide-efficiency-in-bacteria/0_Datasets/E75_Rousset.csv',
+          '/vol/projects/yyu/CRISPRi-guide-efficiency-in-bacteria/0_Datasets/E18_Cui.csv',
+          '/vol/projects/yyu/CRISPRi-guide-efficiency-in-bacteria/0_Datasets/Wang_dataset.csv']
 labels= ['E75 Rousset','E18 Cui','Wang'] #
 rousset=pandas.read_csv(datasets[0],sep="\t",dtype={'log2FC':float,'gene_length':int, 'gene_GC_content':float,'gene_essentiality':int, 'guide_GC_content':float,'intergenic':int, 'distance_start_codon':int,'distance_start_codon_perc':float, 'distance_operon':int, 'operon_downstream_genes':int, 'coding_strand':int, 'homopolymers':int, 'MFE_hybrid_full':float, 'MFE_hybrid_seed':float, 'MFE_homodimer_guide':float, 'MFE_monomer_guide':float, 'off_target_90_100':int, 'off_target_80_90':int, 'off_target_70_80':int, 'off_target_60_70':int})
 rousset['dataset']=[0]*rousset.shape[0]

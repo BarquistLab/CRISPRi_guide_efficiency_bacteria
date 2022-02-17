@@ -14,7 +14,6 @@ import itertools
 import os
 import time 
 import seaborn as sns
-import logging
 import pandas
 import sklearn.model_selection
 import sklearn.metrics
@@ -23,7 +22,6 @@ import autosklearn.metrics
 import autosklearn.regression
 from scipy.stats import spearmanr,pearsonr
 import sys
-import textwrap
 start_time=time.time()
 nts=['A','T','C','G']
 items=list(itertools.product(nts,repeat=2))
