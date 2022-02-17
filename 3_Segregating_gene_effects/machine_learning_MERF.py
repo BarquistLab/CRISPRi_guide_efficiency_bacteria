@@ -7,7 +7,7 @@ Created on Thu Sep 17 17:35:49 2020
 """
 #%%
 import sys
-sys.path.append("/vol/projects/yyu/CRISPRi-ge/lib/python3.7/site-packages/")
+sys.path.append("/vol/projects/yyu/CRISPRi-ge/lib/python3.7/site-packages/numpy")
 import pandas
 from merf import MERF
 import sklearn.model_selection
