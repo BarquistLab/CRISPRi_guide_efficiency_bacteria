@@ -1,0 +1,10 @@
+doc
+papers
+*.fastq
+*.zip
+nohup.out
+*old*
+*test*
+*.tar
+*.gz
+

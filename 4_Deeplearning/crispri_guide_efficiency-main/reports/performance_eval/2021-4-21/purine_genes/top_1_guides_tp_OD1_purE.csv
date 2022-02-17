@@ -1,0 +1,4 @@
+,SpearmanR,Performance_Increase,Wilcoxon_p-value,mean_top_n_guides
+1DCNN_wang_median-sub_guide,-0.2636,-8.37,0.9999966802858703,-7.785005572866219
+1DCNN_rousset_E18_median-sub_guide,0.1846,-8.37,0.9999966802858703,-7.785005572866219
+1DCNN_wang_rousset_E18_median-sub_guide,-0.0779,-1.91,0.9997484879161479,-8.31870448547904
