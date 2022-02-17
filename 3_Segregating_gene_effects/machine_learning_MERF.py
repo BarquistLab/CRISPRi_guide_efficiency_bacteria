@@ -372,7 +372,7 @@ for i in [10,15,30]:
 
 shap_interaction_values=treexplainer.shap_interaction_values(X_df[X_df['dataset'].isin(training_sets)][guide_features])
 pickle.dump(shap_interaction_values, open(path+"/shap_interaction_values_all.pkl", 'wb'))
-print("Done saving SHAP interaction values: %s s"%round(time.time()-start,3))
+open(path + '/Output.txt','a').write("Done saving SHAP interaction values: %s s"%round(time.time()-start,3))
 
 tmp = np.abs(shap_interaction_values).mean(0)
 tmp_1d=defaultdict(list)
