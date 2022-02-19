@@ -28,9 +28,9 @@ class MyParser(argparse.ArgumentParser):
         self.print_help()
         sys.exit(2)
 parser = MyParser(usage='python %(prog)s gRNA CSV file [options]',formatter_class=argparse.RawTextHelpFormatter,description="""
-This is used to compute extensive featurs for gRNAs. Including: 4 thermodynamic features (MFE features), gene information (gene essentiality, operon position, number of downstream genes in the operon, number of downstream essential genes in the operon...)
+This is used to compute extensive features for gRNAs. Including: 4 thermodynamic features (MFE features), gene information (gene essentiality, operon position, number of downstream genes in the operon, number of downstream essential genes in the operon, etc.)
 
-Columns with name 'seq' for gRNA sequence and 'geneid' for the locus tag (in the format b0001) are required.  
+For the input file, CSV format is accepted. Columns with name 'seq' for gRNA sequence and 'geneid' for the locus tag (in the format b0001) are required.  
 
 2 versions of Vienna packages are required. For installation, please check the information in the repository.
 
@@ -38,9 +38,8 @@ Example: python feature_engineering.py test.csv -o test
                   """)
 parser.add_argument("library", help="gRNA library csv file")
 parser.add_argument("-o", "--output", default="results", help="output file name")
-parser.add_argument("-el", "--expression_level_lower", default="01", 
-                    help="""
-the lower boundary of the range of OD value for expression level, which cannot be higher than the upper boundary
+parser.add_argument("-l", "--expression_level_lower", default="01", 
+                    help="""the LOWER boundary of the range of OD value for expression level, which cannot be higher than the upper boundary
 01: OD 0.1
 02: OD 0.2
 03: OD 0.3
@@ -53,9 +52,8 @@ the lower boundary of the range of OD value for expression level, which cannot b
 180: 180min after stationary phase
 default: 01
 """)
-parser.add_argument("-eu", "--expression_level_upper", default="14", 
-                    help="""
-the upper boundary of the range of OD value for expression level, which cannot be lower than the lower boundary
+parser.add_argument("-u", "--expression_level_upper", default="14", 
+                    help="""the UPPER boundary of the range of OD value for expression level, which cannot be lower than the lower boundary
 01: OD 0.1
 02: OD 0.2
 03: OD 0.3
@@ -77,6 +75,13 @@ expression_level_upper=args.expression_level_upper
 ### predefiined files for reference genome
 operon_file="OperonSet.txt"
 expression_level_file="Expression_level_TPM.csv"
+expression_levels=pandas.read_csv(expression_level_file,sep='\t',index_col=0)
+timpepoints=expression_levels.columns.values.tolist()
+OD_range=timpepoints[timpepoints.index("WT_"+expression_level_lower):timpepoints.index("WT_"+expression_level_upper)+1]
+if len(OD_range)==0:
+    print("Please reselect the boundaries for the expression level values")
+    sys.exit()
+expression_levels=expression_levels[OD_range]
 reference_fasta_file="NC_000913.3.fasta"
 reference_gff="NC_000913.3.gff3"
 
@@ -90,6 +95,10 @@ except:
     elif overwrite =="n":
         output_file_name=input("Please give a new output file name:")
         os.mkdir(output_file_name)
+    else:
+        print("Please input valid choice..\nAbort.")
+        sys.exit()
+        
 
 def consecutive_nt_calculation(sequence):
     maxlen=0
@@ -134,8 +143,8 @@ def MFE_folding(sequence):
 
 
 def main():
+    open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
     open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)
-    
     Keio_essential_genes=['alaS', 'btuB', 'coaA', 'coaE', 'djlB', 'dnaG', 'folP', 'glmM', 'glyS', 'groL', 'hemE', 'ileS', 'lptB', 'parC', 'polA', 'prfB', 'priB', 'rho', 'rplK', 'rpoD', 'rpsU', 'tpr', 'yiaD', 'accA', 'accB', 'accC', 'accD', 'acpP', 'acpS', 'adk', 'alsK', 'argS', 'asd', 'asnS', 'aspS', 'bamA', 'bamD', 'bcsB', 'birA', 'can', 'cca', 'cdsA', 'chpS', 'coaD', 'csrA', 'cydA', 'cydC', 'cysS', 'dapA', 'dapB', 'dapD', 'dapE', 'def', 'degS', 'der', 'dfp', 'dicA', 'dnaA', 'dnaB', 'dnaC', 'dnaE', 'dnaN', 'dnaX', 'dut', 'dxr', 'dxs', 'eno', 'entD', 'era', 'erpA', 'fabA', 'fabB', 'fabD', 'fabG', 'fabI', 'fabZ', 'fbaA', 'ffh', 'fldA', 'fmt', 'folA', 'folC', 'folD', 'folE', 'folK', 'frr', 'ftsA', 'ftsB', 'ftsE', 'ftsH', 'ftsI', 'ftsK', 'ftsL', 'ftsN', 'ftsQ', 'ftsW', 'ftsX', 'ftsY', 'ftsZ', 'fusA', 'gapA', 'glmS', 'glmU', 'glnS', 'gltX', 'glyQ', 'gmk', 'gpsA', 'groS', 'grpE', 'gyrA', 'gyrB', 'hemA', 'hemB', 'hemC', 'hemD', 'hemG', 'hemH', 'hemL', 'hisS', 'holA', 'holB', 'igaA', 'infA', 'infB', 'infC', 'ispA', 'ispB', 'ispD', 'ispE', 'ispF', 'ispG', 'ispH', 'kdsA', 'kdsB', 'lepB', 'leuS', 'lexA', 'lgt', 'ligA', 'lnt', 'lolA', 'lolB', 'lolC', 'lolD', 'lolE', 'lptA', 'lptC', 'lptD', 'lptE', 'lptF', 'lptG', 'lpxA', 'lpxB', 'lpxC', 'lpxD', 'lpxH', 'lpxK', 'lspA', 'map', 'mazE', 'metG', 'metK', 'minD', 'minE', 'mlaB', 'mqsA', 'mraY', 'mrdA', 'mrdB', 'mreB', 'mreC', 'mreD', 'msbA', 'mukB', 'mukE', 'mukF', 'murA', 'murB', 'murC', 'murD', 'murE', 'murF', 'murG', 'murI', 'murJ', 'nadD', 'nadE', 'nadK', 'nrdA', 'nrdB', 'nusA', 'nusG', 'obgE', 'orn', 'parE', 'pgk', 'pgsA', 'pheS', 'pheT', 'plsB', 'plsC', 'ppa', 'prfA', 'prmC', 'proS', 'prs', 'psd', 'pssA', 'pth', 'purB', 'pyrG', 'pyrH', 'racR', 'ribA', 'ribB', 'ribC', 'ribD', 'ribE', 'ribF', 'rnc', 'rne', 'rnpA', 'rplB', 'rplC', 'rplD', 'rplE', 'rplF', 'rplJ', 'rplL', 'rplM', 'rplN', 'rplO', 'rplP', 'rplQ', 'rplR', 'rplS', 'rplT', 'rplU', 'rplV', 'rplW', 'rplX', 'rpmA', 'rpmB', 'rpmC', 'rpmD', 'rpmH', 'rpoA', 'rpoB', 'rpoC', 'rpoE', 'rpoH', 'rpsA', 'rpsB', 'rpsC', 'rpsD', 'rpsE', 'rpsG', 'rpsH', 'rpsJ', 'rpsK', 'rpsL', 'rpsN', 'rpsP', 'rpsR', 'rpsS', 'rseP', 'rsmI', 'secA', 'secD', 'secE', 'secF', 'secM', 'secY', 'serS', 'spoT', 'ssb', 'suhB', 'tadA', 'tdcF', 'thiL', 'thrS', 'tilS', 'tmk', 'topA', 'trmD', 'trpS', 'tsaB', 'tsaC', 'tsaD', 'tsaE', 'tsf', 'tyrS', 'ubiA', 'ubiB', 'ubiD', 'ubiV', 'uppS', 'valS', 'waaA', 'waaU', 'wzyE', 'yabQ', 'yafF', 'yagG', 'yceQ', 'ydfB', 'ydiL', 'yefM', 'yejM', 'yhhQ', 'yibJ', 'yidC', 'yihA', 'ymfK', 'yqgD', 'yqgF', 'zipA']
     ## import operons
     operons={}
@@ -191,10 +200,8 @@ def main():
             
             GFF.update({geneid:{"genename":genename,"geneid":geneid,"start":start,"end":end,"GC_content":GC_content,"strand":strand,"length":length,"biotype":gene_biotype,"gene_essentiality":gene_essentiality,"operon_5":operon_5,"operon_3":operon_3,"operon_downstream_genes":operon_downstream_genes,"ess_gene_operon":ess_gene_operon}})
     
-    expression_levels=pandas.read_csv(expression_level_file,sep='\t',index_col=0)
-    timpepoints=expression_levels.columns.values.tolist()
-    OD_range=timpepoints[timpepoints.index("WT_"+expression_level_lower):timpepoints.index("WT_"+expression_level_upper)+1]
-    expression_levels=expression_levels[OD_range]
+    
+    
     ### import library 
     library=pandas.read_csv(library_df,sep="\t",dtype={'geneid':str,'seq':str})
     for i in library.index:
@@ -243,4 +250,4 @@ if __name__ == '__main__':
     logging_file= output_file_name + '/log.txt'
     logging.basicConfig(filename=logging_file,format='%(asctime)s - %(message)s', level=logging.INFO)
     main()
-    logging.info("Execution Time: %s seconds" %('{:.2f}'.format(time.time()-start_time)))    
+    logging.info("Execution Time: %s seconds\n" %('{:.2f}'.format(time.time()-start_time)))    

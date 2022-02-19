@@ -46,14 +46,7 @@ $ tar -zxvf ViennaRNA-2.1.9h.tar.gz
   |biopython        |       1.76         | 
   |flask            |       1.1.2        |
 
-If a Python virtual environment is needed:
-```
-$ python3 -m venv CRISPRi-guide-efficiency
-$ source CRISPRi-guide-efficiency/bin/activate
-```
-To install the packages:
-```
-$ pip install scikit-learn==0.22.1 shap==0.39.0 numpy==1.19.2 merf==1.0 pandas==0.25.3 scipy==1.6.2 seaborn==0.11.2 matplotlib==3.5.0 auto-sklearn==0.10.0 
+
 
 ```  
 
