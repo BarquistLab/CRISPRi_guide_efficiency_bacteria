@@ -1,0 +1,23 @@
+Python script: median_subtracting_model_DL.py
+Parsed arguments: Namespace(choice='cnn', folds=10, output='test', split='guide', test_size=0.2, training='0,1,2')
+
+Total number of guides in dataset ../0_Datasets/E75_Rousset.csv: 59246
+Total number of guides in dataset ../0_Datasets/E18_Cui.csv: 59246
+Total number of guides in dataset ../0_Datasets/Wang_dataset.csv: 52104
+Training dataset: all 3 datasets
+Number of guides for essential genes: 8099 
+Number of features: 13
+Features: sequence_30nt,guide_GC_content,distance_start_codon,distance_start_codon_perc,homopolymers,MFE_hybrid_full,MFE_hybrid_seed,MFE_homodimer_guide,MFE_monomer_guide,off_target_90_100,off_target_80_90,off_target_70_80,off_target_60_70
+Data input Time: 3.88 seconds
+
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f51dcb6bc10>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f51dcad0c10>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f51dca42b80>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f51dcb39460>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f51dc5de5b0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f51dca42ee0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f51dcb6b520>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f51dc53be50>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f51dc54a460>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f51dc53b040>
+Execution Time: 1753.63 seconds

@@ -1,0 +1,8 @@
+X_test
+spearman correlation rho: nan
+spearman correlation p value: nan
+pearson correlation rho: nan
+pearson correlation p value: nan
+r2: -0.0013263818440709674
+explained_variance_score score of X_test :-2.220446049250313e-16
+Mean absolute error regression loss score of X_test :2.608248814397796

@@ -22,6 +22,8 @@ import autosklearn.metrics
 import autosklearn.regression
 from scipy.stats import spearmanr,pearsonr
 import sys
+import warnings
+warnings.filterwarnings('ignore')
 start_time=time.time()
 nts=['A','T','C','G']
 items=list(itertools.product(nts,repeat=2))
@@ -290,8 +292,8 @@ def main():
             resampling_strategy_arguments={'folds': folds},
             tmp_folder=output_file_name+'/autosklearn_regression_example_tmp',
             output_folder=output_file_name+'/autosklearn_regression_example_out',
-            delete_tmp_folder_after_terminate=False,
-            delete_output_folder_after_terminate=False,
+            delete_tmp_folder_after_terminate=True,
+            delete_output_folder_after_terminate=True,
             disable_evaluator_output=False,
             ensemble_memory_limit=1024, ml_memory_limit= 3072,
             ensemble_nbest=50, seed = 1,

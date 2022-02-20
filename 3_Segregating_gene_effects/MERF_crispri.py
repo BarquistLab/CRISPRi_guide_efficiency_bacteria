@@ -50,7 +50,7 @@ Which datasets to use:
 default: 0,1,2""")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
 parser.add_argument("-c", "--choice", default="", help="If train on simplified random-effect model with CAI values, -c CAI. default: None")
-parser.add_argument("-s", "--split", default='guide', help="train-test split stratege. guide/gene. default: guide")
+parser.add_argument("-s", "--split", default='guide', help="train-test split stratege. guide/gene/guide_dropdistance. default: guide")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
 args = parser.parse_args()
@@ -263,7 +263,8 @@ for feature in X_df.columns.values:
     if feature != 'geneid':
         dtypes.update({feature:float})
 X_df=X_df.astype(dtypes)
-
+if os.path.isdir(output_file_name+'/saved_model')==False:  
+    os.mkdir(output_file_name+'/saved_model')
 evaluations=defaultdict(list)
 iteration_predictions=defaultdict(list)
 kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
@@ -343,7 +344,7 @@ for train_index, test_index in kf.split(guideid_set):
     evaluations['Rs_depletion'].append(spearman_rho) # depletion comparison
     if split=='guide' or split=='guide_dropdistance':
         evaluations['Rs_activity'].append(spearmanr(np.array(y_test-test['gene_pred']), mrf_lgbm.trained_fe_model.predict(X_test))[0]) # activity score comparison
-        evaluations['Rs_median'].append(spearmanr(median_test_re,pred_test)[0]) # median logFC vs random-effect model predictions
+        evaluations['Rs_median'].append(spearmanr(median_test_re,y_test)[0]) # median logFC vs 
     for dataset in range(len(set(datasets))):
         test_1 = test[test['dataset']==dataset]
         y_test=test_1['log2FC']
@@ -356,16 +357,41 @@ for train_index, test_index in kf.split(guideid_set):
         if split=='guide' or split=='guide_dropdistance':
             evaluations['Rs_activity_test%s'%(dataset+1)].append(spearmanr(np.array(y_test-test_1['gene_pred']), mrf_lgbm.trained_fe_model.predict(X_test))[0])
             test_1_group=test_1.groupby("geneid").mean()
-            evaluations['Rs_median_test%s'%(dataset+1)].append(spearmanr(test_1_group['median'], test_1_group['gene_pred'])[0])
+            evaluations['Rs_median_test%s'%(dataset+1)].append(spearmanr(test_1_group['median'], y_test)[0])
     
 evaluations=pandas.DataFrame.from_dict(evaluations)
 evaluations.to_csv(output_file_name+'/iteration_scores.csv',sep='\t',index=True)
 iteration_predictions=pandas.DataFrame.from_dict(iteration_predictions)
 iteration_predictions.to_csv(output_file_name+'/iteration_predictions.csv',sep='\t',index=False)
 open(output_file_name + '/log.txt','a').write("Done 10-fold CV: %s s\n"%round(time.time()-start,3))
+
+if split=='gene':
+    open(output_file_name + '/log.txt','a').write("Median Spearman correlation for all gRNAs of each gene: \n")
+    labels= ['E75 Rousset','E18 Cui','Wang']
+    df=iteration_predictions.copy()
+    plot=defaultdict(list)
+    for i in list(df.index):
+        d=defaultdict(list)
+        d['log2FC']+=list(df['log2FC'][i])
+        d['pred']+=list(df['pred'][i])
+        d['geneid']+=list(df['geneid'][i])
+        d['dataset']+=list(df['dataset'][i])
+        D=pandas.DataFrame.from_dict(d)
+        for k in training_sets:
+            D_dataset=D[D['dataset']==k]
+            for j in list(set(D_dataset['geneid'])):
+                D_gene=D_dataset[D_dataset['geneid']==j]
+                sr,_=spearmanr(D_gene['log2FC'],D_gene['pred']) 
+                plot['sr'].append(sr)
+                plot['dataset'].append(k)
+    plot=pandas.DataFrame.from_dict(plot)
+    for k in training_sets:
+        p=plot[plot['dataset']==k]
+        open(output_file_name + '/log.txt','a').write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
+    open(output_file_name + '/log.txt','a').write("Mixed 3 datasets (median/mean): %s / %s \n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
+
+
 #save model trained with all guides
-if os.path.isdir(output_file_name+'/saved_model')==False:  
-    os.mkdir(output_file_name+'/saved_model')
 filename = output_file_name+'/saved_model/CRISPRi_headers.sav'
 pickle.dump(guide_features, open(filename, 'wb'))
 filename = output_file_name+'/saved_model/Merf_model.sav'
@@ -475,7 +501,7 @@ if split=='guide' or split=='guide_dropdistance':
             test.at[j,'gene_pred']=pred_test[i]
     test_re['gene_pred']=pred_test
     test_re['random_med'] = abs(test_re['median'] - test_re['gene_pred'])
-    open(output_file_name + '/log.txt','a').write("Spearman corelation between random effects and median (test): {0}\n".format(spearmanr(median_test_re,pred_test)[0]))
+    open(output_file_name + '/log.txt','a').write("Spearman corelation between random effects and median logFC (test): {0}\n".format(spearmanr(median_test_re,pred_test)[0]))
 
 
 
@@ -528,17 +554,6 @@ plt.close()
 if split=='guide' or split=='guide_dropdistance':
     labels= ['E75 Rousset','E18 Cui','Wang']
     markers=['x','D','s']
-    plt.figure()
-    for data in training_sets:
-        median_dataset=test_re[test_re['dataset']==data]
-        ax=sns.distplot(median_dataset['gene_pred']-median_dataset['median'],label=labels[data])
-        print(labels[data],np.mean(median_dataset['gene_pred']-median_dataset['median']),np.std(median_dataset['gene_pred']-median_dataset['median']))
-    plt.legend()
-    plt.xlabel("Predicted Random effects - Median log2FC of gRNAs for each gene")
-    # plt.title('Test')
-    plt.savefig(output_file_name+"/random_minus_median_test.png",dpi=400)
-    # plt.show()
-    plt.close()
 
     plt.figure()
     for data in training_sets:
@@ -576,8 +591,7 @@ values.to_csv(output_file_name+"/shap_value_mean.csv",index=False,sep='\t')
 open(output_file_name + '/log.txt','a').write("Done calculating SHAP values: %s s\n"%round(time.time()-start,3))
 shap.summary_plot(shap_values, X_train, plot_type="bar",show=False,color_bar=True,max_display=10)
 plt.subplots_adjust(left=0.35, top=0.95)
-plt.title("Test")
-plt.savefig(output_file_name+"/shap_value_bar_test.svg",dpi=400)
+plt.savefig(output_file_name+"/shap_value_bar.svg",dpi=400)
 plt.close()
 
 for i in [10,15,30]:
@@ -589,8 +603,8 @@ for i in [10,15,30]:
     plt.close()    
 
 #SHAP interaction values
-shap_values = treexplainer.shap_values(X_train[:1000,:],check_additivity=False)
-shap_interaction_values=treexplainer.shap_interaction_values(X_train[:1000,:])
+shap_values = treexplainer.shap_values(X_train.iloc[:1000,:],check_additivity=False)
+shap_interaction_values=treexplainer.shap_interaction_values(X_train.iloc[:1000,:])
 # pickle.dump(shap_interaction_values, open(path+"/shap_interaction_values_all.pkl", 'wb'))
 open(output_file_name + '/log.txt','a').write("Done calculating SHAP interaction values: %s s\n"%round(time.time()-start,3))
 
@@ -607,7 +621,7 @@ tmp_1d=tmp_1d.astype({'mean_absolute_interaction_value':float})
 numeric_features=['distance_start_codon','distance_start_codon_perc','homopolymers','guide_GC_content',
                    'MFE_hybrid_full', 'MFE_hybrid_seed', 'MFE_homodimer_guide', 'MFE_monomer_guide']
 p=defaultdict(list)
-X_index=X_train[:1000,:].reset_index(drop=True)
+X_index=X_train.iloc[:1000,:].reset_index(drop=True)
 coms=[[0,0],[1,0],[0,1],[1,1]]
 marker=['-','+']
 tmp_1d['global interaction rank']=tmp_1d.index+1

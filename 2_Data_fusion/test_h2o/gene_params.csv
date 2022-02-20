@@ -1,0 +1,57 @@
+parameter	default	actual	input
+nfolds	0	5	5
+keep_cross_validation_models	True	False	False
+keep_cross_validation_predictions	False	True	True
+keep_cross_validation_fold_assignment	False	True	True
+score_each_iteration	False	False	False
+score_tree_interval	0	5	5
+fold_assignment	AUTO	Modulo	Modulo
+fold_column			
+response_column		{'__meta': {'schema_version': 3, 'schema_name': 'ColSpecifierV3', 'schema_type': 'VecSpecifier'}, 'column_name': 'log2FC', 'is_member_of_frames': None}	{'__meta': {'schema_version': 3, 'schema_name': 'ColSpecifierV3', 'schema_type': 'VecSpecifier'}, 'column_name': 'log2FC', 'is_member_of_frames': None}
+ignored_columns		[]	[]
+ignore_const_cols	True	True	True
+offset_column			
+weights_column			
+balance_classes	False	False	False
+class_sampling_factors			
+max_after_balance_size	5.0	5.0	5.0
+max_confusion_matrix_size	20	20	20
+ntrees	50	85	10000
+max_depth	5	17	17
+min_rows	10.0	15.0	15.0
+nbins	20	20	20
+nbins_top_level	1024	1024	1024
+nbins_cats	1024	1024	1024
+r2_stopping	1.7976931348623157e+308	1.7976931348623157e+308	1.7976931348623157e+308
+stopping_rounds	0	0	3
+stopping_metric	AUTO	MSE	MSE
+stopping_tolerance	0.001	0.012417809977047488	0.012417809977047488
+max_runtime_secs	0.0	0.0	891.016
+seed	-1	5	5
+build_tree_one_node	False	False	False
+learn_rate	0.1	0.1	0.1
+learn_rate_annealing	1.0	1.0	1.0
+distribution	AUTO	gaussian	AUTO
+quantile_alpha	0.5	0.5	0.5
+tweedie_power	1.5	1.5	1.5
+huber_alpha	0.9	0.9	0.9
+checkpoint			
+sample_rate	1.0	0.9	0.9
+sample_rate_per_class			
+col_sample_rate	1.0	1.0	1.0
+col_sample_rate_change_per_level	1.0	1.0	1.0
+col_sample_rate_per_tree	1.0	1.0	1.0
+min_split_improvement	1e-05	1e-05	1e-05
+histogram_type	AUTO	UniformAdaptive	AUTO
+max_abs_leafnode_pred	1.7976931348623157e+308	1.7976931348623157e+308	1.7976931348623157e+308
+pred_noise_bandwidth	0.0	0.0	0.0
+categorical_encoding	AUTO	Enum	AUTO
+calibrate_model	False	False	False
+calibration_frame			
+custom_metric_func			
+custom_distribution_func			
+export_checkpoints_dir			
+monotone_constraints			
+check_constant_response	True	True	True
+gainslift_bins	-1	-1	-1
+auc_type	AUTO	AUTO	AUTO

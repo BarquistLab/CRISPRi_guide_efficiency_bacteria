@@ -22,7 +22,8 @@ from scipy.stats import spearmanr,pearsonr
 from collections import defaultdict
 import shap
 import sys
-import pickle
+import warnings
+warnings.filterwarnings('ignore')
 start_time=time.time()
 nts=['A','T','C','G']
 items=list(itertools.product(nts,repeat=2))

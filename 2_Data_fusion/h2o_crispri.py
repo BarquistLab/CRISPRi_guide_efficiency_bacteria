@@ -7,8 +7,7 @@ Created on Thu Sep 17 17:35:49 2020
 """
 import time
 start_time=time.time()
-import h2o
-from h2o.automl import H2OAutoML
+
 import pandas
 import sklearn.model_selection
 import numpy as np
@@ -26,8 +25,7 @@ import sys
 import warnings
 warnings.filterwarnings('ignore')
 mpl.rcParams['figure.dpi'] = 300
-h2o.init()
-h2o.remove_all()
+
 class MyParser(argparse.ArgumentParser):
     def error(self, message):
         sys.stderr.write('error: %s\n' % message)
@@ -76,6 +74,10 @@ except:
     else:
         print("Please input valid choice..\nAbort.")
         sys.exit()
+import h2o
+from h2o.automl import H2OAutoML
+h2o.init()
+h2o.remove_all()
 def self_encode(sequence):
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
     nts=['A','T','C','G']
@@ -106,7 +108,7 @@ open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
 open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)
 #data fusion
 datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
-training_set_list={[0]: "E75 Rousset",[1]: "E18 Cui",[2]: "Wang", [0,1]: "E75 Rousset & E18 Cui", [0,2]: "E75 Rousset & Wang",  [1,2]: "E18 Cui & Wang",[0,1,2]: "all 3 datasets"}
+training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
 
 rousset=pandas.read_csv(datasets[0],sep="\t")
 rousset['dataset']=[0]*rousset.shape[0]
@@ -125,7 +127,7 @@ combined = combined.dropna()
 open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n"% (datasets[0],rousset.shape[0]))
 open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[1],rousset18.shape[0]))
 open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],wang.shape[0]))
-open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[training_sets])
+open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
 
 
 for i in list(set(list(combined['geneid']))):
@@ -215,10 +217,10 @@ params.to_csv("%s/gene_params.csv"%output_file_name,sep='\t',index=False)
 #save variable importance
 varimp=aml.leader.varimp(use_pandas=True)
 varimp.to_csv("%s/gene_varimp.csv"%output_file_name,sep='\t',index=False)
-aml.leader.varimp_plot()
-plt.savefig("%s/varimp_plot.png"%output_file_name,dpi=400)
+# aml.leader.varimp_plot()
+# plt.savefig("%s/varimp_plot.png"%output_file_name,dpi=400)
 # plt.show()
-plt.close()
+# plt.close()
 
 #save performance evaluation
 perf = aml.leader.model_performance(test)

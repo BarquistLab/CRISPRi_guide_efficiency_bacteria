@@ -518,8 +518,33 @@ def main():
         plt.subplots_adjust(bottom=0.35)
         plt.savefig(output_file_name+"/coef.svg",dpi=400)
         plt.close()
-    elif choice=='rf':
-        SHAP(estimator,X_train,headers)
+    # elif choice=='rf':
+        # SHAP(estimator,X_train,headers)
+        
+    if split=='gene':
+        logging_file.write("Median Spearman correlation for all gRNAs of each gene: \n")
+        labels= ['E75 Rousset','E18 Cui','Wang']
+        df=iteration_predictions.copy()
+        plot=defaultdict(list)
+        for i in list(df.index): #each iteration/CV split
+            d=defaultdict(list)
+            d['log2FC']+=list(df['log2FC'][i])
+            d['pred']+=list(df['pred'][i])
+            d['geneid']+=list(df['geneid'][i])
+            d['dataset']+=list(df['dataset'][i])
+            D=pandas.DataFrame.from_dict(d)
+            for k in training_sets:
+                D_dataset=D[D['dataset']==k]
+                for j in list(set(D_dataset['geneid'])):
+                    D_gene=D_dataset[D_dataset['geneid']==j]
+                    sr,_=spearmanr(D_gene['log2FC'],-D_gene['pred']) 
+                    plot['sr'].append(sr)
+                    plot['dataset'].append(k)
+        plot=pandas.DataFrame.from_dict(plot)
+        for k in training_sets:
+            p=plot[plot['dataset']==k]
+            logging_file.write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
+        logging_file.write("Mixed 3 datasets (median/mean): %s / %s \n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
     logging_file.close()
     
 

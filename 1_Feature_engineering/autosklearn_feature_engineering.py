@@ -22,6 +22,8 @@ import autosklearn.metrics
 import autosklearn.regression
 from scipy.stats import spearmanr,pearsonr
 import sys
+import warnings
+warnings.filterwarnings('ignore')
 start_time=time.time()
 nts=['A','T','C','G']
 items=list(itertools.product(nts,repeat=2))

@@ -1,7 +1,0 @@
-,linear,elnet,random_forest,random_forest_RFE,GBM
-wang_median-sub_guide,0.514,0.48,0.653,0.637,0.537
-rousset_E18_median-sub_guide,0.662,0.505,0.764,0.76,0.688
-rousset_E75_median-sub_guide,0.674,0.491,0.723,0.726,0.694
-wang_rousset_E18_median-sub_guide,0.491,0.45,0.63,0.613,0.513
-wang_rousset_E75_median-sub_guide,0.48,0.438,0.615,0.594,0.506
-wang_rousset_E18_rousset_E75_median-sub_guide,0.492,0.442,0.646,0.62,0.517
