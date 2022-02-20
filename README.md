@@ -1,5 +1,5 @@
 # CRISPRi_guide_efficiency_bacteria
-This repository contains datasets and Python scripts that were used in the study "Automated machine learning and data integration improve prediction of CRISPRi guide efficiency in bacteria from genome-wide essentiality screens". *Each folder corresponds to each section of the paper.* 
+This repository contains datasets and Python scripts that were used in the study **"Automated machine learning and data integration improve prediction of CRISPRi guide efficiency in bacteria from genome-wide essentiality screens"**. *Each folder corresponds to a section of the paper.* 
 
 For each Python script, **"-h" shows the detailed description, options and example to run the script.** The "test" folders are the example output of running the script. Please check the "log.txt" file for the input arguments of the tests. *For simplicity, please run the script at the same location as the script.*
 
@@ -7,12 +7,32 @@ For each Python script, **"-h" shows the detailed description, options and examp
 It contains **3 collected datasets** used in the study with expanded feature set and **files related to the reference genome** to calculate the features used by "feature_enginnering.py".  
 
 ### 1_Feature_engineering
-It contains 2 Python scripts: one for optimizing the model using *auto-sklearn* (autosklearn_feature_engineering.py), the other for evaluating the optimized models from auto-sklearn (feature_sets.py). The choice of different feature sets can be specified with option **"-c / --choice"**.  
+It contains 2 Python scripts: 
+* autosklearn_feature_engineering.py: for optimizing the model using *auto-sklearn*, 
+* feature_sets.py: for evaluating the optimized models from auto-sklearn. 
+The choice of different feature sets can be specified with option **"-c / --choice"**.  
 
 ### 2_Data_fusion
 
-It contains 3 Python scripts: one for optimizing the model using *auto-sklearn* (autosklearn_datafusion.py), one for evaluating the optimized models from auto-sklearn and other model tyeps (datafusion.py), and one for testing another automated machine learning tool H2O (h2o_crispri.py). The choice of different training dataset(s) can be specified with option **"-training"**.  The choice of model type can be specified with option **"-c / --choice"**.
+It contains 3 Python scripts: 
+* autosklearn_datafusion.py: for optimizing the model using *auto-sklearn*
+* datafusion.py: for evaluating the optimized models from auto-sklearn and other model tyeps
+* h2o_crispri.py: for testing another automated machine learning tool H2O. 
+The choice of different training dataset(s) can be specified with option **"-training"**.  The choice of model type can be specified with option **"-c / --choice"**.
 
+### 3_Segregating_gene_effects
+
+It contains 2 Python scripts: 
+* MERF_crispri.py: for segregating gene and guide effects using *MERF*, followed by interpreting the model with SHAP. To test the simiplied gene feature set, it can be specified by "-c CAI".
+* median_subtracting_model.py: for segregating gene and guide effects using *Median subtracting method*. Either **rf or lasso** (random forest or LASSO model) can be specified by "-c / --choice".
+The choice of different training dataset(s) can be specified with option **"-training"**.  The choice of train-test split can be specified with option **"-s / --split"**. To test the models without distance associated features, please use "-s guide_dropdistance".
+
+### 4_Deeplearning
+
+It contains 1 Python scripts and supplementary scripts for deap learning model: 
+* median_subtracting_model_DL.py:segregating gene and guide effects using *Median subtracting method*. Either **cnn or gru** (CNN or GRU model) can be specified by "-c / --choice".
+* crispri_dl: it contains the scripts that are required to run the deep learning models, such as data loading and architectures.  
+The choice of different training dataset(s) can be specified with option **"-training"**. 
  
 
 # Requirements
@@ -62,7 +82,3 @@ $ tar -zxvf ViennaRNA-2.1.9h.tar.gz
   make
   sudo make install
 '''
-
-	   
-
-

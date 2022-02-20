@@ -50,7 +50,7 @@ Which datasets to use:
 default: 0,1,2""")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
 parser.add_argument("-c", "--choice", default="", help="If train on simplified random-effect model with CAI values, -c CAI. default: None")
-parser.add_argument("-s", "--split", default='guide', help="train-test split stratege. guide/gene/guide_dropdistance. default: guide")
+parser.add_argument("-s", "--split", default='guide', help="train-test split stratege. guide/gene/guide_dropdistance. guide_dropdistance: To test the models without distance associated features. default: guide")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
 args = parser.parse_args()
