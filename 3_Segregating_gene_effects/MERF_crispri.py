@@ -253,7 +253,7 @@ estimator=RandomForestRegressor(bootstrap=True, criterion='friedman_mse', max_de
                         min_samples_leaf=18, min_samples_split=16,
                         min_weight_fraction_leaf=0.0, n_estimators=512, n_jobs=1,
                         verbose=0, warm_start=False,random_state = np.random.seed(111))
-open( output_file_name+ '/log.txt','a').write("Estimator:"+str(estimator)+"\n")
+open( output_file_name+ '/log.txt','a').write("Estimator:"+str(estimator)+"\n\n\n")
 guide_features=X_guide.columns.values.tolist()
 X_df=pandas.DataFrame(data=np.c_[X_gene,X_guide,y,clusters,guideids,medians,datasets],columns=gene_features+guide_features+['log2FC','geneid','guideid','median','dataset'])
 X_df = X_df.loc[:,~X_df.columns.duplicated()]
@@ -363,7 +363,7 @@ evaluations=pandas.DataFrame.from_dict(evaluations)
 evaluations.to_csv(output_file_name+'/iteration_scores.csv',sep='\t',index=True)
 iteration_predictions=pandas.DataFrame.from_dict(iteration_predictions)
 iteration_predictions.to_csv(output_file_name+'/iteration_predictions.csv',sep='\t',index=False)
-open(output_file_name + '/log.txt','a').write("Done 10-fold CV: %s s\n"%round(time.time()-start,3))
+open(output_file_name + '/log.txt','a').write("\n\nDone 10-fold CV: %s s\n\n\n"%round(time.time()-start,3))
 
 if split=='gene':
     open(output_file_name + '/log.txt','a').write("Median Spearman correlation for all gRNAs of each gene: \n")
@@ -388,7 +388,7 @@ if split=='gene':
     for k in training_sets:
         p=plot[plot['dataset']==k]
         open(output_file_name + '/log.txt','a').write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
-    open(output_file_name + '/log.txt','a').write("Mixed 3 datasets (median/mean): %s / %s \n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
+    open(output_file_name + '/log.txt','a').write("Mixed 3 datasets (median/mean): %s / %s \n\n\n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
 
 
 #save model trained with all guides
@@ -428,12 +428,12 @@ clusters_test=test['geneid']
 mrf_lgbm = MERF(estimator,max_iterations=15)
 mrf_lgbm.fit(X_train, Z_train, clusters_train, y_train,X_val, Z_val, clusters_val, y_val)
 pickle.dump(mrf_lgbm.trained_fe_model, open(output_file_name+"/trained_fe_model.pkl", 'wb'))
-open(output_file_name + '/log.txt','a').write("Done training model: %s s\n"%round(time.time()-start,3))
+open(output_file_name + '/log.txt','a').write("\n\n\nDone training model: %s s\n"%round(time.time()-start,3))
 predictions = mrf_lgbm.predict(X_test, Z_test, clusters_test)  
 spearman_rho,spearman_p_value=spearmanr(np.array(y_test), np.array(predictions))
 open(output_file_name + '/log.txt','a').write("Spearman corelation of combined test: {0}\n".format(spearman_rho))
 pearson_rho,_=pearsonr(np.array(y_test), np.array(predictions))
-open(output_file_name + '/log.txt','a').write("Pearson corelation of combined test: {0}\n".format(pearson_rho))
+open(output_file_name + '/log.txt','a').write("Pearson corelation of combined test: {0}\n\n".format(pearson_rho))
 
 #random effect model predictions
 cluster_counts = clusters_train.value_counts()
@@ -501,7 +501,7 @@ if split=='guide' or split=='guide_dropdistance':
             test.at[j,'gene_pred']=pred_test[i]
     test_re['gene_pred']=pred_test
     test_re['random_med'] = abs(test_re['median'] - test_re['gene_pred'])
-    open(output_file_name + '/log.txt','a').write("Spearman corelation between random effects and median logFC (test): {0}\n".format(spearmanr(median_test_re,pred_test)[0]))
+    open(output_file_name + '/log.txt','a').write("Spearman corelation between random effects and median logFC (test): {0}\n\n".format(spearmanr(median_test_re,pred_test)[0]))
 
 
 
@@ -606,7 +606,7 @@ for i in [10,15,30]:
 shap_values = treexplainer.shap_values(X_train.iloc[:1000,:],check_additivity=False)
 shap_interaction_values=treexplainer.shap_interaction_values(X_train.iloc[:1000,:])
 # pickle.dump(shap_interaction_values, open(path+"/shap_interaction_values_all.pkl", 'wb'))
-open(output_file_name + '/log.txt','a').write("Done calculating SHAP interaction values: %s s\n"%round(time.time()-start,3))
+open(output_file_name + '/log.txt','a').write("Done calculating SHAP interaction values: %s s\n\n"%round(time.time()-start,3))
 
 tmp = np.abs(shap_interaction_values).mean(0)
 tmp_1d=defaultdict(list)
