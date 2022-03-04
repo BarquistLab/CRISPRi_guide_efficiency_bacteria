@@ -147,7 +147,8 @@ def DataFrame_input(df):
                 df.at[j,'median']=median
                 df.at[j,'activity_score']=median-df['log2FC'][j]
     drop_features=['std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
-                   "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','gene_essentiality']
+                   "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','gene_essentiality',
+                   'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
     if split=='gene':
         drop_features.append("geneid")
     for feature in drop_features:
@@ -215,31 +216,6 @@ def SHAP(estimator,X,headers):
         plt.xticks(fontsize='small')
         plt.savefig(output_file_name+"/shap_value_top%s.svg"%(i),dpi=400)
         plt.close()    
-def encode(seq):
-    return np.array([[int(b==p) for b in seq] for p in ["A","T","G","C"]])
-def find_target(df,before=20,after=20):
-    from Bio import SeqIO
-    fasta_sequences = SeqIO.parse(open("../0_Datasets/NC_000913.3.fasta"),'fasta')    
-    for fasta in fasta_sequences:  # input reference genome
-        reference_fasta=fasta.seq 
-    extended_seq=[]
-    guides_index=list()
-    for i in df.index.values:
-        if len(df['sequence'][i])!=20 or df["genome_pos_5_end"][i]<20 or df["genome_pos_3_end"][i]<20 :
-            continue
-        guides_index.append(i)
-        if df["genome_pos_5_end"][i] > df["genome_pos_3_end"][i]:
-            extended_seq.append(str(reference_fasta[df["genome_pos_3_end"][i]-1-after:df["genome_pos_5_end"][i]+before].reverse_complement()))
-        else:
-            extended_seq.append(str(reference_fasta[df["genome_pos_5_end"][i]-1-before:df["genome_pos_3_end"][i]+after]))
-    return extended_seq,guides_index
-def encode_seqarr(seq,r):
-    '''One hot encoding of the sequence. r specifies the position range.'''
-    X = np.array(
-            [encode(''.join([s[i] for i in r])) for s in seq]
-        )
-    X = X.reshape(X.shape[0], -1)
-    return X
 
 def main():
     open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
@@ -276,25 +252,6 @@ def main():
     evaluations=defaultdict(list)
     iteration_predictions=defaultdict(list)
     kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
-    if len(datasets)>1:
-        pasteur_test = training_df[(training_df['gene_essentiality']==1)&(training_df['coding_strand']==1)&(training_df['intergenic']==0)]
-        pasteur_test=pasteur_test.dropna().reset_index(drop=True)
-        for i in list(set(pasteur_test['geneid'])):
-            p_gene=pasteur_test[pasteur_test['geneid']==i]
-            for j in p_gene.index:
-                pasteur_test.at[j,'Nr_guide']=p_gene.shape[0]
-                pasteur_test.at[j,'std']=np.std(p_gene['log2FC'])
-        pasteur_test=pasteur_test[pasteur_test['std']>=np.quantile(pasteur_test['std'],0.2)]
-        pasteur_test=pasteur_test[pasteur_test['Nr_guide']>=5]
-        import statistics
-        for dataset in range(len(datasets)):
-            test_data=pasteur_test[pasteur_test['dataset']==dataset]
-            for i in list(set(test_data['geneid'])):
-                gene_df=test_data[test_data['geneid']==i]
-                for j in gene_df.index:
-                    pasteur_test.at[j,'median']=statistics.median(gene_df['log2FC'])
-                    pasteur_test.at[j,'guideid']=guide_sequence_set.index(pasteur_test['sequence'][j])
-                    pasteur_test.at[j,'activity_score']=statistics.median(gene_df['log2FC'])-pasteur_test['log2FC'][j]
     # for train_index, test_index in kf.split(X_rescaled,y):
     X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,median,guideids,dataset_col],
                               columns=headers+['activity','log2FC','median','guideid','dataset_col'])
@@ -320,9 +277,14 @@ def main():
         y_val=X_val['activity']
         X_val=X_val[headers]
         
+        # from sklearn.preprocessing import StandardScaler
+        # scaler=StandardScaler()
+        # X_train=pandas.DataFrame(np.c_[scaler.fit_transform(X_train[header]),X_train['sequence_30nt']],columns=header+['sequence_30nt'])
+        # X_val=pandas.DataFrame(np.c_[scaler.transform(X_val[header]),X_val['sequence_30nt']],columns=header+['sequence_30nt'])
+        # X_test=pandas.DataFrame(np.c_[scaler.transform(X_test[header]),X_test['sequence_30nt']],columns=header+['sequence_30nt'])
+        
         #loader
         loader_train = CrisprDatasetTrain(X_train, y_train, header)
-        print(str(loader_train))
         loader_train = DataLoader(loader_train, batch_size=batch_size, num_workers = 6, shuffle = True, drop_last=True)
         dataset_val  = CrisprDatasetTrain(X_val, y_val, header)
         loader_val = DataLoader(dataset_val, batch_size=batch_size, num_workers = 6, drop_last=True)

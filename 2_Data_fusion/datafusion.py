@@ -275,6 +275,7 @@ def main():
     X=pandas.DataFrame(data=X,columns=headers)
     X=X.astype(dtypes)
    
+    
     # auto-sklearn include all 
     if choice=='autosklearn':
         from sklearn.experimental import enable_hist_gradient_boosting
@@ -358,14 +359,20 @@ def main():
         X_train=X_train[headers]
         X_train=X_train.astype(dtypes)
         
+        # from sklearn.preprocessing import StandardScaler
+        # scaler=StandardScaler()
+        # X_train=scaler.fit_transform(X_train)
+        
         test = X_df[X_df['guideid'].isin(test_index)]
         X_test=test[(test['dataset'].isin(training_sets))]
         y_test=X_test['log2FC']
         X_test=X_test[headers]
         X_test=X_test.astype(dtypes)
+        # X_test=scaler.transform(X_test)
     
         estimator = estimator.fit(np.array(X_train,dtype=float),np.array(y_train,dtype=float))
         predictions = estimator.predict(np.array(X_test,dtype=float))
+        # print(spearmanr(y_test, predictions,nan_policy='omit')[0])
         evaluations['Rs'].append(spearmanr(y_test, predictions)[0])
         # Evaluation(output_file_name,y_test,predictions,"X_test_kfold")
         X_test_1=test[headers]
