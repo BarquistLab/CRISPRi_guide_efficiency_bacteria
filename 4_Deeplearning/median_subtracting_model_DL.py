@@ -348,6 +348,9 @@ def main():
                 y_test_1=dataset1['activity_score']
                 log2FC_test_1=np.array(dataset1['log2FC'],dtype=float)
                 median_test_1=np.array(dataset1['median'],dtype=float)
+                
+                # X_test_1=pandas.DataFrame(np.c_[scaler.transform(X_test_1[header]),X_test_1['sequence_30nt']],columns=header+['sequence_30nt'])
+
                 loader_test = CrisprDatasetTrain(X_test_1, y_test_1, header)
                 loader_test = DataLoader(loader_test, batch_size=X_test_1.shape[0], num_workers = 6, shuffle = False)
                 predictions=list()
