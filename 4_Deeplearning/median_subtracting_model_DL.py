@@ -31,6 +31,9 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 from crispri_dl.dataloader import CrisprDatasetTrain
+from sklearn.preprocessing import StandardScaler
+from pytorch_lightning import seed_everything
+
 warnings.filterwarnings('ignore')
 class MyParser(argparse.ArgumentParser):
     def error(self, message):
@@ -54,7 +57,7 @@ Which datasets to use:
     0,1,2: all 3 datasets
 default: 0,1,2""")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
-parser.add_argument("-c", "--choice", default="cnn", help="If train on CNN or GRU model, cnn/gru. default: cnn")
+parser.add_argument("-c", "--choice", default="cnn", help="If train on CNN or GRU model, cnn/gru/crispron. default: cnn")
 parser.add_argument("-s", "--split", default='guide', help="train-test split stratege. guide/gene. default: guide")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
@@ -218,6 +221,7 @@ def SHAP(estimator,X,headers):
         plt.close()    
 
 def main():
+    seed_everything(111,workers=True)
     open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
     open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)
     df1=pandas.read_csv(datasets[0],sep="\t")
@@ -245,8 +249,8 @@ def main():
     filename = output_file_name+'/CRISPRi_headers.sav'
     pickle.dump(headers, open(filename, 'wb'))
     max_epochs = 500
-    batch_size = 64
-    patience = 30
+    batch_size = 32
+    patience = 5
     
     #k-fold cross validation
     evaluations=defaultdict(list)
@@ -283,13 +287,21 @@ def main():
         # X_val=pandas.DataFrame(np.c_[scaler.transform(X_val[header]),X_val['sequence_30nt']],columns=header+['sequence_30nt'])
         # X_test=pandas.DataFrame(np.c_[scaler.transform(X_test[header]),X_test['sequence_30nt']],columns=header+['sequence_30nt'])
         
+        
+        SCALE = StandardScaler()
+        
+        X_train[header] = SCALE.fit_transform(X_train[header])
+        X_val[header] = SCALE.transform(X_val[header])
+        X_test[header] = SCALE.transform(X_test[header])
+        
+        
         #loader
         loader_train = CrisprDatasetTrain(X_train, y_train, header)
-        loader_train = DataLoader(loader_train, batch_size=batch_size, num_workers = 6, shuffle = True, drop_last=True)
+        loader_train = DataLoader(loader_train, batch_size=batch_size, shuffle = True)
         dataset_val  = CrisprDatasetTrain(X_val, y_val, header)
-        loader_val = DataLoader(dataset_val, batch_size=batch_size, num_workers = 6, drop_last=True)
+        loader_val = DataLoader(dataset_val, batch_size=batch_size)
         loader_test = CrisprDatasetTrain(X_test, y_test, header)
-        loader_test = DataLoader(loader_test, batch_size=X_test.shape[0], num_workers = 6, shuffle = False)
+        loader_test = DataLoader(loader_test, batch_size=X_test.shape[0])
         #train
         early_stop_callback = EarlyStopping(
             monitor="val_loss", 
@@ -301,13 +313,14 @@ def main():
                     monitor = 'val_loss',
                     dirpath = output_file_name,
                     filename = "model_"+str(fold_inner),
-                    verbose = False,
+                    verbose = True,
                     save_top_k = 1,
                     mode = 'min',)
-        estimator = pl.Trainer( callbacks=[early_stop_callback,checkpoint_callback], max_epochs=max_epochs, check_val_every_n_epoch=1, logger=True,progress_bar_refresh_rate = 0, weights_summary=None)
+        
+        estimator = pl.Trainer(gpus=0, callbacks=[early_stop_callback,checkpoint_callback], max_epochs=max_epochs, check_val_every_n_epoch=1, logger=True,progress_bar_refresh_rate = 0, weights_summary=None)
         open(output_file_name + '/log.txt','a').write("Estimator:"+str(estimator)+"\n")
     
-        from crispri_dl.architectures import Crispr1DCNN, CrisprGRU
+        from crispri_dl.architectures import Crispr1DCNN, CrisprGRU, CrisprOn1DCNN
         filename_model = output_file_name + '/model_'+str(fold_inner) + ".ckpt"
         
         #load trained model
@@ -317,18 +330,18 @@ def main():
         elif choice=='gru':
             estimator.fit(CrisprGRU(len(header)), train_dataloader = loader_train, val_dataloaders = loader_val)  
             trained_model = CrisprGRU.load_from_checkpoint(filename_model, num_features = len(header))
+        elif choice=='crispron':
+            estimator.fit(CrisprOn1DCNN(len(header)), train_dataloader = loader_train, val_dataloaders = loader_val)  
+            trained_model = CrisprOn1DCNN.load_from_checkpoint(filename_model, num_features = len(header))
     
-        #test
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") 
-        trained_model = trained_model.to(device)
-        trained_model.eval()
-        trained_model.freeze()
-        predictions=list()
-        for x_sequence_30nt, x_features, _ in loader_test:
-            with torch.no_grad():
-                predictions_test = trained_model(x_sequence_30nt.to(device), x_features.to(device)).detach()
-        predictions.extend(predictions_test.cpu().numpy())
-        predictions=np.array(predictions).flatten()
+    
+        predictions_test = estimator.predict(
+        model=trained_model,
+        dataloaders=loader_test,
+        return_predictions=True,
+        ckpt_path=filename_model)
+        #print(len(predictions_test))
+        predictions = predictions_test[0].cpu().numpy().flatten()
         fold_inner+=1
         iteration_predictions['log2FC'].append(list(log2FC_test))
         iteration_predictions['pred'].append(list(predictions))
@@ -352,22 +365,23 @@ def main():
                 # X_test_1=pandas.DataFrame(np.c_[scaler.transform(X_test_1[header]),X_test_1['sequence_30nt']],columns=header+['sequence_30nt'])
 
                 loader_test = CrisprDatasetTrain(X_test_1, y_test_1, header)
-                loader_test = DataLoader(loader_test, batch_size=X_test_1.shape[0], num_workers = 6, shuffle = False)
-                predictions=list()
-                for x_sequence_30nt, x_features, _  in loader_test:
-                    with torch.no_grad():
-                        predictions_test = trained_model(x_sequence_30nt.to(device), x_features.to(device)).detach()
-                predictions.extend(predictions_test.cpu().numpy())
-                predictions=np.array(predictions).flatten()
+                loader_test = DataLoader(loader_test, batch_size=X_test_1.shape[0], shuffle = False)
+                predictions_test = estimator.predict(
+                model=trained_model,
+                dataloaders=loader_test,
+                return_predictions=True,
+                ckpt_path=filename_model)
+                #print(len(predictions_test))
+                predictions = predictions_test[0].cpu().numpy().flatten()
                 spearman_rho,_=spearmanr(y_test_1, predictions)
                 evaluations['Rs_activity_test%s'%(dataset+1)].append(spearman_rho)
                 evaluations['Rs_depletion_test%s'%(dataset+1)].append(spearmanr(log2FC_test_1, median_test_1-predictions)[0])
             
 
     evaluations=pandas.DataFrame.from_dict(evaluations)
-    evaluations.to_csv(output_file_name+'/iteration_scores_test.csv',sep='\t',index=True)
+    evaluations.to_csv(output_file_name+'/iteration_scores.csv',sep='\t',index=True)
     iteration_predictions=pandas.DataFrame.from_dict(iteration_predictions)
-    iteration_predictions.to_csv(output_file_name+'/iteration_predictions_test.csv',sep='\t',index=False)
+    iteration_predictions.to_csv(output_file_name+'/iteration_predictions.csv',sep='\t',index=False)
     
     index_train, index_val = sklearn.model_selection.train_test_split(guideid_set, test_size=0.2,random_state=np.random.seed(111))
     X_train = X_df[X_df['guideid'].isin(index_train)]
@@ -380,9 +394,9 @@ def main():
     X_val=X_val[headers]
     #loader
     loader_train = CrisprDatasetTrain(X_train, y_train, header)
-    loader_train = DataLoader(loader_train, batch_size=batch_size, num_workers = 6, shuffle = True, drop_last=True)
+    loader_train = DataLoader(loader_train, batch_size=batch_size, shuffle = True, drop_last=True)
     dataset_val  = CrisprDatasetTrain(X_val, y_val, header)
-    loader_val = DataLoader(dataset_val, batch_size=batch_size, num_workers = 6, drop_last=True)
+    loader_val = DataLoader(dataset_val, batch_size=batch_size, drop_last=True)
     #train
     early_stop_callback = EarlyStopping(
         monitor="val_loss", 
@@ -403,9 +417,33 @@ def main():
         estimator.fit(Crispr1DCNN(len(header)), train_dataloader = loader_train, val_dataloaders = loader_val) 
     elif choice=='gru':
         estimator.fit(CrisprGRU(len(header)), train_dataloader = loader_train, val_dataloaders = loader_val)  
-  
-    
-
+    elif choice=='crispron':
+        estimator.fit(CrisprOn1DCNN(len(header)), train_dataloader = loader_train, val_dataloaders = loader_val)  
+    if split=='gene':
+        logging_file= open(output_file_name + '/log.txt','a')
+        logging_file.write("Median Spearman correlation for all gRNAs of each gene: \n")
+        labels= ['E75 Rousset','E18 Cui','Wang']
+        df=iteration_predictions.copy()
+        plot=defaultdict(list)
+        for i in list(df.index): #each iteration/CV split
+            d=defaultdict(list)
+            d['log2FC']+=list(df['log2FC'][i])
+            d['pred']+=list(df['pred'][i])
+            d['geneid']+=list(df['geneid'][i])
+            d['dataset']+=list(df['dataset'][i])
+            D=pandas.DataFrame.from_dict(d)
+            for k in training_sets:
+                D_dataset=D[D['dataset']==k]
+                for j in list(set(D_dataset['geneid'])):
+                    D_gene=D_dataset[D_dataset['geneid']==j]
+                    sr,_=spearmanr(D_gene['log2FC'],-D_gene['pred']) 
+                    plot['sr'].append(sr)
+                    plot['dataset'].append(k)
+        plot=pandas.DataFrame.from_dict(plot)
+        for k in training_sets:
+            p=plot[plot['dataset']==k]
+            logging_file.write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
+        logging_file.write("Mixed 3 datasets (median/mean): %s / %s \n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
 
 if __name__ == '__main__':
     main()

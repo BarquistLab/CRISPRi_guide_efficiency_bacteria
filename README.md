@@ -60,6 +60,8 @@ All scripts were written in Python (version 3.8). To install all Python dependen
   |scipy            |       1.6.2        |
   |biopython        |       1.76         | 
   |h2o              |       3.30.1.1     |
+  |pytorch          |       1.8.1        |
+  |pytorch-lightning|       1.5.10       |
 
 
 
