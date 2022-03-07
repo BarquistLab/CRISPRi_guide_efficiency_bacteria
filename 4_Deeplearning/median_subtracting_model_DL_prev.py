@@ -31,9 +31,6 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 from crispri_dl.dataloader import CrisprDatasetTrain
-from sklearn.preprocessing import StandardScaler
-from pytorch_lightning import seed_everything
-
 warnings.filterwarnings('ignore')
 class MyParser(argparse.ArgumentParser):
     def error(self, message):
@@ -221,7 +218,6 @@ def SHAP(estimator,X,headers):
         plt.close()    
 
 def main():
-    seed_everything(111,workers=True)
     open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
     open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)
     df1=pandas.read_csv(datasets[0],sep="\t")
@@ -249,8 +245,8 @@ def main():
     filename = output_file_name+'/CRISPRi_headers.sav'
     pickle.dump(headers, open(filename, 'wb'))
     max_epochs = 500
-    batch_size = 32
-    patience = 5
+    batch_size = 64
+    patience = 30
     
     #k-fold cross validation
     evaluations=defaultdict(list)
@@ -287,21 +283,13 @@ def main():
         # X_val=pandas.DataFrame(np.c_[scaler.transform(X_val[header]),X_val['sequence_30nt']],columns=header+['sequence_30nt'])
         # X_test=pandas.DataFrame(np.c_[scaler.transform(X_test[header]),X_test['sequence_30nt']],columns=header+['sequence_30nt'])
         
-        
-        SCALE = StandardScaler()
-        
-        X_train[header] = SCALE.fit_transform(X_train[header])
-        X_val[header] = SCALE.transform(X_val[header])
-        X_test[header] = SCALE.transform(X_test[header])
-        
-        
         #loader
         loader_train = CrisprDatasetTrain(X_train, y_train, header)
-        loader_train = DataLoader(loader_train, batch_size=batch_size, shuffle = True)
+        loader_train = DataLoader(loader_train, batch_size=batch_size, num_workers = 6, shuffle = True, drop_last=True)
         dataset_val  = CrisprDatasetTrain(X_val, y_val, header)
-        loader_val = DataLoader(dataset_val, batch_size=batch_size)
+        loader_val = DataLoader(dataset_val, batch_size=batch_size, num_workers = 6, drop_last=True)
         loader_test = CrisprDatasetTrain(X_test, y_test, header)
-        loader_test = DataLoader(loader_test, batch_size=X_test.shape[0])
+        loader_test = DataLoader(loader_test, batch_size=X_test.shape[0], num_workers = 6, shuffle = False)
         #train
         early_stop_callback = EarlyStopping(
             monitor="val_loss", 
@@ -313,31 +301,34 @@ def main():
                     monitor = 'val_loss',
                     dirpath = output_file_name,
                     filename = "model_"+str(fold_inner),
-                    verbose = True,
+                    verbose = False,
                     save_top_k = 1,
                     mode = 'min',)
-        
-        estimator = pl.Trainer(gpus=0, callbacks=[early_stop_callback,checkpoint_callback], max_epochs=max_epochs, check_val_every_n_epoch=1, logger=True,progress_bar_refresh_rate = 0, weights_summary=None)
+        estimator = pl.Trainer( callbacks=[early_stop_callback,checkpoint_callback], max_epochs=max_epochs, check_val_every_n_epoch=1, logger=True,progress_bar_refresh_rate = 0, weights_summary=None)
         open(output_file_name + '/log.txt','a').write("Estimator:"+str(estimator)+"\n")
     
-        from crispri_dl.architectures import Crispr1DCNN, CrisprGRU, CrisprOn1DCNN
+        from crispri_dl.architectures import Crispr1DCNN, CrisprGRU
         filename_model = output_file_name + '/model_'+str(fold_inner) + ".ckpt"
         
         #load trained model
         if choice=='cnn':
-            estimator.fit(CrisprOn1DCNN(len(header)), train_dataloader = loader_train, val_dataloaders = loader_val)  
-            trained_model = CrisprOn1DCNN.load_from_checkpoint(filename_model, num_features = len(header))
+            estimator.fit(Crispr1DCNN(len(header)), train_dataloader = loader_train, val_dataloaders = loader_val)  
+            trained_model = Crispr1DCNN.load_from_checkpoint(filename_model, num_features = len(header))
         elif choice=='gru':
             estimator.fit(CrisprGRU(len(header)), train_dataloader = loader_train, val_dataloaders = loader_val)  
             trained_model = CrisprGRU.load_from_checkpoint(filename_model, num_features = len(header))
     
-        predictions_test = estimator.predict(
-        model=trained_model,
-        dataloaders=loader_test,
-        return_predictions=True,
-        ckpt_path=filename_model)
-        #print(len(predictions_test))
-        predictions = predictions_test[0].cpu().numpy().flatten()
+        #test
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") 
+        trained_model = trained_model.to(device)
+        trained_model.eval()
+        trained_model.freeze()
+        predictions=list()
+        for x_sequence_30nt, x_features, _ in loader_test:
+            with torch.no_grad():
+                predictions_test = trained_model(x_sequence_30nt.to(device), x_features.to(device)).detach()
+        predictions.extend(predictions_test.cpu().numpy())
+        predictions=np.array(predictions).flatten()
         fold_inner+=1
         iteration_predictions['log2FC'].append(list(log2FC_test))
         iteration_predictions['pred'].append(list(predictions))
@@ -361,14 +352,13 @@ def main():
                 # X_test_1=pandas.DataFrame(np.c_[scaler.transform(X_test_1[header]),X_test_1['sequence_30nt']],columns=header+['sequence_30nt'])
 
                 loader_test = CrisprDatasetTrain(X_test_1, y_test_1, header)
-                loader_test = DataLoader(loader_test, batch_size=X_test_1.shape[0], shuffle = False)
-                predictions_test = estimator.predict(
-                model=trained_model,
-                dataloaders=loader_test,
-                return_predictions=True,
-                ckpt_path=filename_model)
-                #print(len(predictions_test))
-                predictions = predictions_test[0].cpu().numpy().flatten()
+                loader_test = DataLoader(loader_test, batch_size=X_test_1.shape[0], num_workers = 6, shuffle = False)
+                predictions=list()
+                for x_sequence_30nt, x_features, _  in loader_test:
+                    with torch.no_grad():
+                        predictions_test = trained_model(x_sequence_30nt.to(device), x_features.to(device)).detach()
+                predictions.extend(predictions_test.cpu().numpy())
+                predictions=np.array(predictions).flatten()
                 spearman_rho,_=spearmanr(y_test_1, predictions)
                 evaluations['Rs_activity_test%s'%(dataset+1)].append(spearman_rho)
                 evaluations['Rs_depletion_test%s'%(dataset+1)].append(spearmanr(log2FC_test_1, median_test_1-predictions)[0])
@@ -390,9 +380,9 @@ def main():
     X_val=X_val[headers]
     #loader
     loader_train = CrisprDatasetTrain(X_train, y_train, header)
-    loader_train = DataLoader(loader_train, batch_size=batch_size, shuffle = True, drop_last=True)
+    loader_train = DataLoader(loader_train, batch_size=batch_size, num_workers = 6, shuffle = True, drop_last=True)
     dataset_val  = CrisprDatasetTrain(X_val, y_val, header)
-    loader_val = DataLoader(dataset_val, batch_size=batch_size, drop_last=True)
+    loader_val = DataLoader(dataset_val, batch_size=batch_size, num_workers = 6, drop_last=True)
     #train
     early_stop_callback = EarlyStopping(
         monitor="val_loss", 
