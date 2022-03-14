@@ -100,12 +100,12 @@ $ tar -zxvf ViennaRNA-2.1.9h.tar.gz
   ./configure --program-suffix=2.1.9h
   make
   sudo make install
-'''
+```
 If you install it e.g. on a cluster without sudo rights you can follow this:
-'''
+```
 ./configure --prefix=$HOME  --program-suffix=2.1.9h or 2.4.14    #this will create a bin folder in your $HOME directory
 make
 make install
 export PATH=$HOME/bin:$PATH		# You may want to add this to your ~/.bashrc or ~/.bash_profile
-'''
+```
 
