@@ -1,5 +1,5 @@
 # CRISPRi_guide_efficiency_bacteria
-This repository contains datasets and Python scripts that were used in the study **"Automated machine learning and data integration improve prediction of CRISPRi guide efficiency in bacteria from genome-wide essentiality screens"**. *Each folder corresponds to a section of the paper.* 
+This repository contains datasets and Python scripts that were used in the study **"Improved prediction of bacterial CRISPRi guide efficiency through data integration and automated machine learning"**. *Each folder corresponds to a section of the paper.* 
 
 For each Python script, **"-h" shows the detailed description, options and example to run the script.** The "test" folders are the example output of running the script. Please check the "log.txt" file for the input arguments of the tests. *For simplicity, please run the script at the same location as the script.*
 
@@ -40,7 +40,7 @@ The choice of different training dataset(s) can be specified with option **"-tra
 
 ### 5_gRNA_design
 
-It contains 1 Python scripts for gRNA desgin and efficiency prediction similar to the webpage interface (https://ciao.helmholtz-hiri.de). The Python script version extends the function of the webtool to design gRNAs for **multiple sequences from FASTA input file** and **selected genes by gene name or gene ID when GFF file and reference genome FASTA are provided**.
+It contains 1 Python scripts for gRNA desgin and efficiency prediction similar to the webpage interface (https://ciao.helmholtz-hiri.de). The Python script version extends the function of the webtool to design gRNAs for **multiple sequences from FASTA input file** and **selected genes by gene name or gene ID** when *reference genome FASTA and GFF* files are provided.
 
 Requirements can be installed by creating a conda environment from the file "environment.yml".
 ```
