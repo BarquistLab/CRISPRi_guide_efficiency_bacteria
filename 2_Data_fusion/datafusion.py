@@ -94,7 +94,7 @@ except:
     else:
         print("Please input valid choice..\nAbort.")
         sys.exit()
-def self_encode(sequence):
+def self_encode(sequence):#one-hot encoding for single nucleotide features
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
     nts=['A','T','C','G']
     for i in range(len(sequence)):
@@ -102,7 +102,7 @@ def self_encode(sequence):
     sequence_one_hot_encoded = integer_encoded.flatten()
     return sequence_one_hot_encoded
 
-def dinucleotide(sequence):
+def dinucleotide(sequence):#encoding for dinucleotide features
     nts=['A','T','C','G']
     items=list(itertools.product(nts,repeat=2))
     dinucleotides=list(map(lambda x: x[0]+x[1],items))
@@ -124,7 +124,7 @@ def DataFrame_input(df,coding_strand=1):
         for j in df_gene.index:
             df.at[j,'Nr_guide']=df_gene.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
-    df=df[df['Nr_guide']>=5]
+    df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
     
     sequences=list(dict.fromkeys(df['sequence']))
     y=np.array(df['log2FC'],dtype=float)
@@ -132,13 +132,13 @@ def DataFrame_input(df,coding_strand=1):
     PAM_encoded=[]
     sequence_encoded=[]
     dinucleotide_encoded=[]
-    
     for i in df.index:
         PAM_encoded.append(self_encode(df['PAM'][i]))
         sequence_encoded.append(self_encode(df['sequence'][i]))
         dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
         df.at[i,'geneid']=int(df['geneid'][i][1:])
         df.at[i,'guideid']=sequences.index(df['sequence'][i])
+    #check if the length of gRNA and PAM from all samples is the same
     if len(list(set(map(len,list(df['PAM'])))))==1:
         PAM_len=int(list(set(map(len,list(df['PAM']))))[0])
     else:
@@ -152,7 +152,7 @@ def DataFrame_input(df,coding_strand=1):
     else:
         print("error: sequence len")
     guideids=np.array(list(df['guideid']))
-    
+    # remove columns that are not used in training
     drop_features=['std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality',
                    'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
@@ -242,27 +242,20 @@ def main():
     df1 = df1.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     df1['dataset']=[0]*df1.shape[0]
     open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n"% (datasets[0],df1.shape[0]))
-    if len(datasets)>1:       
-        df2=pandas.read_csv(datasets[1],sep="\t")
-        df2 = df2.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-        df2['dataset']=[1]*df2.shape[0]
-        open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[1],df2.shape[0]))
-        if len(datasets)==3:
-            df3=pandas.read_csv(datasets[2],sep="\t")
-            df3 = df3.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-            df3['dataset']=[2]*df3.shape[0]
-            df2=df2.append(df3,ignore_index=True)  
-            open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],df3.shape[0]))
-            # split into training and validation
-        training_df=df1.append(df2,ignore_index=True)  
-        training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-        
-        
-    else:
-        training_df=df1
+    df2=pandas.read_csv(datasets[1],sep="\t")
+    df2 = df2.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
+    df2['dataset']=[1]*df2.shape[0]
+    open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[1],df2.shape[0]))
+    df3=pandas.read_csv(datasets[2],sep="\t")
+    df3 = df3.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
+    df3['dataset']=[2]*df3.shape[0]
+    df2=df2.append(df3,ignore_index=True)  
+    open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],df3.shape[0]))
+    training_df=df1.append(df2,ignore_index=True)  
+    training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
+    #dropping unnecessary features and encode sequence features
     X,y,headers,guideids, guide_sequence_set,dataset_col=DataFrame_input(training_df)
-    
     open(output_file_name + '/log.txt','a').write("Data input Time: %s seconds\n\n" %('{:.2f}'.format(time.time()-start_time)))  
     
     numerical_indicator=["gene_GC_content","distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_length","gene_expression_min","gene_expression_max",\
@@ -274,9 +267,8 @@ def main():
             dtypes.update({feature:int})
     X=pandas.DataFrame(data=X,columns=headers)
     X=X.astype(dtypes)
-   
     
-    # auto-sklearn include all 
+    ##optimized models from auto-sklearn
     if choice=='autosklearn':
         from sklearn.experimental import enable_hist_gradient_boosting
         from sklearn.ensemble import HistGradientBoostingRegressor
@@ -348,9 +340,8 @@ def main():
     #k-fold cross validation
     evaluations=defaultdict(list)
     kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
-        
     guideid_set=list(set(guideids))
-    for train_index, test_index in kf.split(guideid_set):
+    for train_index, test_index in kf.split(guideid_set):##split the combined training set into train and test based on guideid
         train_index=np.array(guideid_set)[train_index]
         test_index=np.array(guideid_set)[test_index]
         X_train = X_df[X_df['guideid'].isin(train_index)]
@@ -384,19 +375,16 @@ def main():
         # Evaluation(output_file_name,y_test_1,predictions,"X_test_mixed")
         for dataset in range(len(datasets)):
             dataset1=test[test['dataset']==dataset]
-            
             X_test_1=dataset1[headers]
             y_test_1=np.array(dataset1['log2FC'],dtype=float)
             predictions=estimator.predict(np.array(X_test_1,dtype=float))
             spearman_rho,_=spearmanr(y_test_1, predictions)
             evaluations['Rs_test%s'%(dataset+1)].append(spearman_rho)
             # Evaluation(output_file_name,y_test_1,predictions,"X_test_%s"%(dataset+1))
-            
      
     evaluations=pandas.DataFrame.from_dict(evaluations)
     evaluations.to_csv(output_file_name+'/iteration_scores.csv',sep='\t',index=True)
     
-    ### Inplemented functions
     logging_file= open(output_file_name + '/log.txt','a')
     ##split the combined training set into train and test
     guide_train, guide_test = sklearn.model_selection.train_test_split(list(set(guideids)), test_size=test_size,random_state=np.random.seed(111))  
@@ -405,7 +393,6 @@ def main():
     y_train=X_train['log2FC']
     X_train = X_train[headers]
     X_train=X_train.astype(dtypes)
-    
     
     X_test = X_df[X_df['guideid'].isin(guide_test)]
     X_test=X_test[(X_test['dataset'].isin(training_sets))]
@@ -417,7 +404,6 @@ def main():
     Evaluation(output_file_name,y_test,predictions,"X_test")
     ### model validation with validation dataset
     if len(datasets)>1:
-        
         if 'dataset' not in X.columns.values.tolist():
             X_combined=pandas.DataFrame(data=np.c_[X,y,guideids,dataset_col],columns=headers+['log2FC','guideid','dataset'])
         else:

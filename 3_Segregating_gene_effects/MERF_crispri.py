@@ -94,7 +94,7 @@ for handler in logging.root.handlers[:]:
 logging.basicConfig(filename=logging_file,format='%(asctime)s - %(message)s', level=logging.INFO)
 
 
-def self_encode(sequence):
+def self_encode(sequence):#one-hot encoding for single nucleotide features
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
     nts=['A','T','C','G']
     for i in range(len(sequence)):
@@ -102,7 +102,7 @@ def self_encode(sequence):
     sequence_one_hot_encoded = integer_encoded.flatten()
     return sequence_one_hot_encoded
 
-def dinucleotide(sequence):
+def dinucleotide(sequence):#encoding for dinucleotide features
     nts=['A','T','C','G']
     items=list(itertools.product(nts,repeat=2))
     dinucleotides=list(map(lambda x: x[0]+x[1],items))
@@ -132,7 +132,7 @@ def DataFrame_input(df):
         for j in df_gene.index:
             df.at[j,'nr_guides']=df_gene.shape[0]
     open(output_file_name + '/log.txt','a').write("Number of guides for essential genes: %s \n" % df.shape[0])
-    df=df[df['nr_guides']>=5]
+    df=df[df['nr_guides']>=5]#keep only genes with more than 5 guides from all 3 datasets
     ### one hot encoded sequence features
     PAM_encoded=[]
     sequence_encoded=[]
@@ -151,6 +151,7 @@ def DataFrame_input(df):
                 df.at[i,'CAI']=0
         df.at[i,'geneid']=int(df['geneid'][i][1:])
         df.at[i,'guideid']=guide_sequence_set.index(df['sequence'][i])
+    #check if the length of gRNA and PAM from all samples is the same
     if len(list(set(map(len,list(df['PAM'])))))==1:
         PAM_len=int(list(set(map(len,list(df['PAM']))))[0])
     else:
@@ -163,6 +164,7 @@ def DataFrame_input(df):
         dinucleotide_len=int(list(set(map(len,list(df['sequence_30nt']))))[0])
     else:
         print("error: sequence len")
+    #define guideid based on chosen split method
     if split=='guide' or split=='guide_dropdistance':
         guideids=np.array(list(df['guideid']))
     elif split=='gene':
@@ -190,6 +192,7 @@ def DataFrame_input(df):
             pass
     
     X=df.copy()
+    # dataframe for gene features (random-effect model)
     gene_fea=['overlapping','dataset','geneid',"gene_GC_content","distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_length","gene_expression_min","gene_expression_max",'CAI']#
     headers=list(X.columns.values)
     gene_features=[item for item in gene_fea if item in headers]
@@ -197,8 +200,8 @@ def DataFrame_input(df):
         gene_features.remove("geneid")
     if  "CAI" not in choice:
         gene_features.remove("dataset")
-    X_gene=X[gene_features]
-    
+    X_gene=X[gene_features] 
+    # dataframe for guide features (fixed-effect model)
     guide_features=[item for item in headers if item not in gene_fea]
     X_guide=np.c_[X[guide_features],sequence_encoded,PAM_encoded,dinucleotide_encoded] #
     ###add one-hot encoded sequence features to headers
@@ -246,8 +249,8 @@ X_gene,X_guide, y, gene_features,guide_features,guide_sequence_set,guideids,clus
 
 open(output_file_name + '/log.txt','a').write("Number of clusters: %s\n" % len(set(clusters)))
 open(output_file_name + '/log.txt','a').write("Done processing input: %s s\n\n"%round(time.time()-start,3))
-
-estimator=RandomForestRegressor(bootstrap=True, criterion='friedman_mse', max_depth=None, #origin & test
+#optimized RF model from auto-skelearn
+estimator=RandomForestRegressor(bootstrap=True, criterion='friedman_mse', max_depth=None, 
                         max_features=0.22442857329791677, max_leaf_nodes=None,
                         min_impurity_decrease=0.0, 
                         min_samples_leaf=18, min_samples_split=16,
@@ -269,7 +272,7 @@ evaluations=defaultdict(list)
 iteration_predictions=defaultdict(list)
 kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
 iteration=0
-for train_index, test_index in kf.split(guideid_set):
+for train_index, test_index in kf.split(guideid_set):##split the combined training set into train and test based on guideid
     guide_train = np.array(guideid_set)[train_index]
     test_index = np.array(guideid_set)[test_index]
     guide_train, guide_val = sklearn.model_selection.train_test_split(guide_train, test_size=test_size,random_state=np.random.seed(111))  
@@ -322,7 +325,7 @@ for train_index, test_index in kf.split(guideid_set):
     for i in pred.index:
         train_gene=train[train['geneid']==i]
         for j in train_gene.index:
-            train.at[j,'gene_pred']=pred[i]
+            train.at[j,'gene_pred']=pred[i] #prediction from random-effect model for train
     if split=='guide' or split=='guide_dropdistance':        
         coef=pandas.DataFrame(mrf_lgbm.trained_b,index=mrf_lgbm.trained_b.index)
         cluster_counts = clusters_test.value_counts()
@@ -335,7 +338,7 @@ for train_index, test_index in kf.split(guideid_set):
         for i in pred_test.index:
             test_gene=test[test['geneid']==i]
             for j in test_gene.index:
-                test.at[j,'gene_pred']=pred_test[i]
+                test.at[j,'gene_pred']=pred_test[i]  #prediction from random-effect model for test
 
     # test in 3 datasets
     predictions = mrf_lgbm.predict(X_test, Z_test, clusters_test)        
@@ -607,7 +610,7 @@ shap_values = treexplainer.shap_values(X_train.iloc[:1000,:],check_additivity=Fa
 shap_interaction_values=treexplainer.shap_interaction_values(X_train.iloc[:1000,:])
 # pickle.dump(shap_interaction_values, open(path+"/shap_interaction_values_all.pkl", 'wb'))
 open(output_file_name + '/log.txt','a').write("Done calculating SHAP interaction values: %s s\n\n"%round(time.time()-start,3))
-
+#mean absolute values
 tmp = np.abs(shap_interaction_values).mean(0)
 tmp_1d=defaultdict(list)
 for i in range(len(guide_features)):
@@ -621,14 +624,15 @@ tmp_1d=tmp_1d.astype({'mean_absolute_interaction_value':float})
 numeric_features=['distance_start_codon','distance_start_codon_perc','homopolymers','guide_GC_content',
                    'MFE_hybrid_full', 'MFE_hybrid_seed', 'MFE_homodimer_guide', 'MFE_monomer_guide']
 p=defaultdict(list)
-X_index=X_train.iloc[:1000,:].reset_index(drop=True)
-coms=[[0,0],[1,0],[0,1],[1,1]]
+X_index=X_train.iloc[:1000,:].reset_index(drop=True) #use the same index as SHAP values
+coms=[[0,0],[1,0],[0,1],[1,1]] # 4 different types of feature combinations, 0 for -, 1 for +
 marker=['-','+']
 tmp_1d['global interaction rank']=tmp_1d.index+1
-for rank in tmp_1d.index[:5000]:
-# main_feature='GC2425'
+for rank in tmp_1d.index[:5000]: #calculate the combination SHAP values for the top 5000 interaction pairs
     pair=[tmp_1d['feature1'][rank],tmp_1d['feature2'][rank]]
     for i in coms:
+        # for sequence features, 0 and 1 means absent or present of the nucleotide of corresponding positions
+        # for numeric features, 0 means values in the lower 0.5 quantile, and 1 means values in the upper 0.5 quantile.
         if pair[0] not in numeric_features and  pair[1] not in numeric_features:
             sample_df=X_index[(X_index[pair[0]]==i[0])&(X_index[pair[1]]==i[1])]     
         elif pair[0] in numeric_features and pair[1] not in numeric_features:
@@ -661,7 +665,7 @@ for rank in tmp_1d.index[:5000]:
     tmp_1d.at[rank,'expected_+/+']=f1+f2
     tmp_1d.at[rank,'expected_-/-']=f1_m+f2_m
 tmp_1d.to_csv(output_file_name+"/interaction_pair_sumSHAPvalues.csv",index=False,sep='\t')
-
+# plots for the reported pairs 
 marker=['-','+']
 pairs=[['sequence_20_C','GC2728'],['sequence_20_G','GC2728'],['sequence_20_A','GG2728'],['GG2728','TG2526']]
 labels={'GC2728':'+1 C','sequence_20_G':'20 G','sequence_20_C':'20 C','GG2728':'+1 G','sequence_20_A':'20 A','TG2526':'P1 T'}

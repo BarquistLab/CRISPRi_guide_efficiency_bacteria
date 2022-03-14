@@ -82,7 +82,7 @@ except:
 datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
 
-def self_encode(sequence):
+def self_encode(sequence):#one-hot encoding for single nucleotide features
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
     nts=['A','T','C','G']
     for i in range(len(sequence)):
@@ -90,7 +90,7 @@ def self_encode(sequence):
     sequence_one_hot_encoded = integer_encoded.flatten()
     return sequence_one_hot_encoded
 
-def dinucleotide(sequence):
+def dinucleotide(sequence):#encoding for dinucleotide features
     nts=['A','T','C','G']
     items=list(itertools.product(nts,repeat=2))
     dinucleotides=list(map(lambda x: x[0]+x[1],items))
@@ -121,7 +121,7 @@ def DataFrame_input(df):
         df_gene=df[df['geneid']==i]
         for j in df_gene.index:
             df.at[j,'Nr_guide']=df_gene.shape[0]
-    df=df[df['Nr_guide']>=5]
+    df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
     sequences=list(dict.fromkeys(df['sequence']))
     log2FC=np.array(df['log2FC'],dtype=float)
     ### one hot encoded sequence features
@@ -134,6 +134,7 @@ def DataFrame_input(df):
         dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
         df.at[i,'geneid']=int(df['geneid'][i][1:])
         df.at[i,'guideid']=sequences.index(df['sequence'][i])
+    #check if the length of gRNA and PAM from all samples is the same
     if len(list(set(map(len,list(df['PAM'])))))==1:
         PAM_len=int(list(set(map(len,list(df['PAM']))))[0])
     else:
@@ -146,6 +147,7 @@ def DataFrame_input(df):
         dinucleotide_len=int(list(set(map(len,list(df['sequence_30nt']))))[0])
     else:
         print("error: sequence len")
+    #define guideid based on chosen split method
     if split=='guide' or split=='guide_dropdistance':
         guideids=np.array(list(df['guideid']))
     elif split=='gene':
@@ -153,7 +155,7 @@ def DataFrame_input(df):
     else:
         print('Unexpected split method...')
         sys.exit()
-    
+    # remove columns that are not used in training
     drop_features=['std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
     if split=='gene':
@@ -307,15 +309,15 @@ def main():
     df2 = df2.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     df2['dataset']=[1]*df2.shape[0]
     open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[1],df2.shape[0]))
-    if len(datasets)==3:
-        df3=pandas.read_csv(datasets[2],sep="\t")
-        df3 = df3.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-        df3['dataset']=[2]*df3.shape[0]
-        df2=df2.append(df3,ignore_index=True)  
-        open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],df3.shape[0]))
+    df3=pandas.read_csv(datasets[2],sep="\t")
+    df3 = df3.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
+    df3['dataset']=[2]*df3.shape[0]
+    df2=df2.append(df3,ignore_index=True)  
+    open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],df3.shape[0]))
     training_df=df1.append(df2,ignore_index=True)  
     training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
+    #dropping unnecessary features and encode sequence features
     X,y,headers,dataset_col,log2FC,median,guideids, guide_sequence_set = DataFrame_input(training_df)
     open(output_file_name + '/log.txt','a').write("Data input Time: %s seconds\n\n" %('{:.2f}'.format(time.time()-start_time)))  
     
@@ -375,33 +377,34 @@ def main():
             dtypes.update({feature:float})
     X_df=X_df.astype(dtypes)
     guideid_set=list(set(guideids))
+    
+    #preprocess for testing Pasteur model
+    pasteur_test = training_df[(training_df['gene_essentiality']==1)&(training_df['coding_strand']==1)&(training_df['intergenic']==0)]
+    pasteur_test=pasteur_test.dropna().reset_index(drop=True)
+    for i in list(set(pasteur_test['geneid'])):
+        p_gene=pasteur_test[pasteur_test['geneid']==i]
+        for j in p_gene.index:
+            pasteur_test.at[j,'Nr_guide']=p_gene.shape[0]
+    pasteur_test=pasteur_test[pasteur_test['Nr_guide']>=5]
+    import statistics
+    for dataset in range(len(datasets)):
+        test_data=pasteur_test[pasteur_test['dataset']==dataset]
+        for i in list(set(test_data['geneid'])):
+            gene_df=test_data[test_data['geneid']==i]
+            for j in gene_df.index:
+                pasteur_test.at[j,'median']=statistics.median(gene_df['log2FC'])
+                if split=='guide' or split=='guide_dropdistance':
+                    pasteur_test.at[j,'guideid']=guide_sequence_set.index(pasteur_test['sequence'][j])
+                elif split=='gene':
+                    pasteur_test.at[j,'guideid']=int(pasteur_test['geneid'][j][1:])
+                pasteur_test.at[j,'activity_score']=statistics.median(gene_df['log2FC'])-pasteur_test['log2FC'][j]
     #k-fold cross validation
     evaluations=defaultdict(list)
     iteration_predictions=defaultdict(list)
     kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
-    if len(datasets)>1:
-        pasteur_test = training_df[(training_df['gene_essentiality']==1)&(training_df['coding_strand']==1)&(training_df['intergenic']==0)]
-        pasteur_test=pasteur_test.dropna().reset_index(drop=True)
-        for i in list(set(pasteur_test['geneid'])):
-            p_gene=pasteur_test[pasteur_test['geneid']==i]
-            for j in p_gene.index:
-                pasteur_test.at[j,'Nr_guide']=p_gene.shape[0]
-        pasteur_test=pasteur_test[pasteur_test['Nr_guide']>=5]
-        import statistics
-        for dataset in range(len(datasets)):
-            test_data=pasteur_test[pasteur_test['dataset']==dataset]
-            for i in list(set(test_data['geneid'])):
-                gene_df=test_data[test_data['geneid']==i]
-                for j in gene_df.index:
-                    pasteur_test.at[j,'median']=statistics.median(gene_df['log2FC'])
-                    if split=='guide' or split=='guide_dropdistance':
-                        pasteur_test.at[j,'guideid']=guide_sequence_set.index(pasteur_test['sequence'][j])
-                    elif split=='gene':
-                        pasteur_test.at[j,'guideid']=int(pasteur_test['geneid'][j][1:])
-                    pasteur_test.at[j,'activity_score']=statistics.median(gene_df['log2FC'])-pasteur_test['log2FC'][j]
     
     iteration=0
-    for train_index, test_index in kf.split(guideid_set):
+    for train_index, test_index in kf.split(guideid_set):##split the combined training set into train and test based on guideid
         train_index = np.array(guideid_set)[train_index]
         test_index = np.array(guideid_set)[test_index]
         X_train = X_df[X_df['guideid'].isin(train_index)]
@@ -477,10 +480,9 @@ def main():
     iteration_predictions=pandas.DataFrame.from_dict(iteration_predictions)
     iteration_predictions.to_csv(output_file_name+'/iteration_predictions.csv',sep='\t',index=False)
     
-    ### Inplemented functions
     logging_file= open(output_file_name + '/log.txt','a')
     
-    #save models
+    #save models trained with all samples
     estimator.fit(np.array(X_df[X_df['dataset_col'].isin(training_sets)][headers]),np.array(X_df[X_df['dataset_col'].isin(training_sets)]['activity']))
     os.mkdir(output_file_name+'/saved_model')
     filename = output_file_name+'/saved_model/CRISPRi_model.sav'
@@ -518,8 +520,8 @@ def main():
         plt.subplots_adjust(bottom=0.35)
         plt.savefig(output_file_name+"/coef.svg",dpi=400)
         plt.close()
-    # elif choice=='rf':
-        # SHAP(estimator,X_train,headers)
+    elif choice=='rf':
+        SHAP(estimator,X_train,headers)
         
     if split=='gene':
         logging_file.write("Median Spearman correlation for all gRNAs of each gene: \n")

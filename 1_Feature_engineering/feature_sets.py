@@ -74,7 +74,7 @@ except:
     else:
         print("Please input valid choice..\nAbort.")
         sys.exit()
-def self_encode(sequence):
+def self_encode(sequence):#one-hot encoding for single nucleotide features
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
     nts=['A','T','C','G']
     for i in range(len(sequence)):
@@ -82,7 +82,7 @@ def self_encode(sequence):
     sequence_one_hot_encoded = integer_encoded.flatten()
     return sequence_one_hot_encoded
 
-def dinucleotide(sequence):
+def dinucleotide(sequence):#encoding for dinucleotide features
     nts=['A','T','C','G']
     items=list(itertools.product(nts,repeat=2))
     dinucleotides=list(map(lambda x: x[0]+x[1],items))
@@ -134,7 +134,7 @@ def DataFrame_input(df,coding_strand=1):
         print("error: sequence len")
     
     guideids=np.array(list(df['guideid']))
-    
+    # remove columns that are not used in training
     drop_features=['std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
     for feature in drop_features:
@@ -143,11 +143,11 @@ def DataFrame_input(df,coding_strand=1):
         except KeyError:  
             pass
         
-    X=df.drop(['log2FC'],1)#activity_score
+    X=df.drop(['log2FC'],1)
     dataset_col=np.array(X['dataset'],dtype=int)  
     headers=list(X.columns.values)
     gene_features=['dataset','geneid',"gene_GC_content","distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_length","gene_expression_min","gene_expression_max"]#
-
+    #different opptions for feature sets
     if choice=='only_guide':
         headers=[item for item in headers if item not in gene_features]
     elif choice=='add_distance':
@@ -241,28 +241,24 @@ def SHAP(estimator,X,y,headers):
 def main():
     open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
     open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)
-
+    # load 3 datesets
     df1=pandas.read_csv(datasets[0],sep="\t")
     df1 = df1.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     df1['dataset']=[0]*df1.shape[0]
     open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n"% (datasets[0],df1.shape[0]))
-    if len(datasets)>1:       
-        df2=pandas.read_csv(datasets[1],sep="\t")
-        df2 = df2.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-        df2['dataset']=[1]*df2.shape[0]
-        open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[1],df2.shape[0]))
-        if len(datasets)==3:
-            df3=pandas.read_csv(datasets[2],sep="\t")
-            df3 = df3.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-            df3['dataset']=[2]*df3.shape[0]
-            df2=df2.append(df3,ignore_index=True)  
-            open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],df3.shape[0]))
-            # split into training and validation
-        training_df=df1.append(df2,ignore_index=True)  
-        training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-    else:
-        training_df=df1
+    df2=pandas.read_csv(datasets[1],sep="\t")
+    df2 = df2.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
+    df2['dataset']=[1]*df2.shape[0]
+    open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[1],df2.shape[0]))
+    df3=pandas.read_csv(datasets[2],sep="\t")
+    df3 = df3.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
+    df3['dataset']=[2]*df3.shape[0]
+    df2=df2.append(df3,ignore_index=True)  
+    open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],df3.shape[0]))
+    training_df=df1.append(df2,ignore_index=True)  
+    training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
+    #dropping unnecessary features and encode sequence features
     X,y,headers,guideids, guide_sequence_set,dataset_col=DataFrame_input(training_df)
     open(output_file_name + '/log.txt','a').write("Data input Time: %s seconds\n\n" %('{:.2f}'.format(time.time()-start_time)))  
     
@@ -312,6 +308,7 @@ def main():
     
     guideid_set=list(set(guideids))
     for train_index, test_index in kf.split(guideid_set):
+        ##split the combined training set into train and test based on guideid
         train_index=np.array(guideid_set)[train_index]
         test_index=np.array(guideid_set)[test_index]
         X_train = X_df[X_df['guideid'].isin(train_index)]

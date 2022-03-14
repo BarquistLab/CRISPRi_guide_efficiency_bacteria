@@ -78,7 +78,7 @@ import h2o
 from h2o.automl import H2OAutoML
 h2o.init()
 h2o.remove_all()
-def self_encode(sequence):
+def self_encode(sequence):#one-hot encoding for single nucleotide features
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
     nts=['A','T','C','G']
     for i in range(len(sequence)):
@@ -86,7 +86,7 @@ def self_encode(sequence):
     sequence_one_hot_encoded = integer_encoded.flatten()
     return sequence_one_hot_encoded
 
-def dinucleotide(sequence):
+def dinucleotide(sequence):#encoding for dinucleotide features
     nts=['A','T','C','G']
     items=list(itertools.product(nts,repeat=2))
     dinucleotides=list(map(lambda x: x[0]+x[1],items))
@@ -109,7 +109,7 @@ open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)
 #data fusion
 datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
-
+# load 3 datesets
 rousset=pandas.read_csv(datasets[0],sep="\t")
 rousset['dataset']=[0]*rousset.shape[0]
 rousset = rousset.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
@@ -135,8 +135,9 @@ for i in list(set(list(combined['geneid']))):
     for j in df_gene.index:
         combined.at[j,'Nr_guide']=df_gene.shape[0]
 logging.info("Number of guides for essential genes: %s \n" % combined.shape[0])
-combined=combined[combined['Nr_guide']>=5]
+combined=combined[combined['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
 guide_sequence_set=list(dict.fromkeys(combined['sequence']))
+### one hot encoded sequence features
 PAM_encoded=[]
 sequence_encoded=[]
 dinucleotide_encoded=[]
@@ -146,6 +147,7 @@ for i in combined.index:
     dinucleotide_encoded.append(dinucleotide(combined['sequence_30nt'][i]))
     combined.at[i,'geneid']=int(combined['geneid'][i][1:])
     combined.at[i,'guideid']=guide_sequence_set.index(combined['sequence'][i])
+#check if the length of gRNA and PAM from all samples is the same
 if len(list(set(map(len,list(combined['PAM'])))))==1:
     PAM_len=int(list(set(map(len,list(combined['PAM']))))[0])
 else:
@@ -184,7 +186,7 @@ logging.info("Features: "+",".join(features)+"\n")
 open(output_file_name + '/log.txt','a').write("Data input Time: %s seconds\n\n" %('{:.2f}'.format(time.time()-start_time)))  
 # X=h2o.H2OFrame(X)
 y="log2FC"
-
+##split the combined training set into train and test
 guide_train, guide_test = sklearn.model_selection.train_test_split(range(len(guide_sequence_set)), test_size=test_size,random_state=np.random.seed(111))  
 X_df=pandas.DataFrame(data=np.c_[X,guideids],columns=features+['guideid'])
 train = X_df[X_df['guideid'].isin(guide_train)]
@@ -230,10 +232,11 @@ logging.info("Performance of gene model:\n %s" %str(perf))
 model=aml.leader
 model_path=h2o.save_model(model, path=output_file_name)
 open(output_file_name + '/log.txt','a').write("Estimator:"+str(model)+"\n")
+#k-fold cross validation
 evaluations=defaultdict(list)
 kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
-
-for train_index, test_index in kf.split(range(len(guide_sequence_set))):
+guideid_set=list(set(guideids))
+for train_index, test_index in kf.split(guideid_set):##split the combined training set into train and test based on guideid
     train = X_df[X_df['guideid'].isin(train_index)]
     train=train[train['dataset'].isin(training_sets)]
     train=train.drop('guideid',1)
@@ -262,7 +265,7 @@ evaluations=pandas.DataFrame.from_dict(evaluations)
 evaluations.to_csv(output_file_name+'/iteration_scores.csv',sep='\t',index=True)
 
 
-guide_train, guide_test = sklearn.model_selection.train_test_split(range(len(guide_sequence_set)), test_size=test_size,random_state=np.random.seed(111))  
+guide_train, guide_test = sklearn.model_selection.train_test_split(guideid_set, test_size=test_size,random_state=np.random.seed(111))  
 train = X_df[X_df['guideid'].isin(guide_train)]
 train=train[train['dataset'].isin(training_sets)]
 train = train.drop('guideid',1)

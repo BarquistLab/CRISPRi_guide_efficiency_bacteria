@@ -100,7 +100,7 @@ except:
         print("Please input valid choice..\nAbort.")
         sys.exit()
         
-def self_encode(sequence):
+def self_encode(sequence):#one-hot encoding for single nucleotide features
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
     nts=['A','T','C','G']
     for i in range(len(sequence)):
@@ -108,7 +108,7 @@ def self_encode(sequence):
     sequence_one_hot_encoded = integer_encoded.flatten()
     return sequence_one_hot_encoded
 
-def dinucleotide(sequence):
+def dinucleotide(sequence):#encoding for dinucleotide features
     nts=['A','T','C','G']
     items=list(itertools.product(nts,repeat=2))
     dinucleotides=list(map(lambda x: x[0]+x[1],items))
@@ -130,7 +130,7 @@ def DataFrame_input(df,coding_strand=1):
         for j in df_gene.index:
             df.at[j,'Nr_guide']=df_gene.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
-    df=df[df['Nr_guide']>=5]
+    df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
     
     sequences=list(dict.fromkeys(df['sequence']))
     y=np.array(df['log2FC'],dtype=float)
@@ -138,14 +138,13 @@ def DataFrame_input(df,coding_strand=1):
     PAM_encoded=[]
     sequence_encoded=[]
     dinucleotide_encoded=[]
-    
-    
     for i in df.index:
         PAM_encoded.append(self_encode(df['PAM'][i]))
         sequence_encoded.append(self_encode(df['sequence'][i]))
         dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
         df.at[i,'geneid']=int(df['geneid'][i][1:])
         df.at[i,'guideid']=sequences.index(df['sequence'][i])
+    #check if the length of gRNA and PAM from all samples is the same
     if len(list(set(map(len,list(df['PAM'])))))==1:
         PAM_len=int(list(set(map(len,list(df['PAM']))))[0])
     else:
@@ -160,6 +159,7 @@ def DataFrame_input(df,coding_strand=1):
         print("error: sequence len")
     
     guideids=np.array(list(df['guideid']))
+    # remove columns that are not used in training
     drop_features=['Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality',
                    'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
@@ -168,7 +168,7 @@ def DataFrame_input(df,coding_strand=1):
             df=df.drop(feature,1)
         except KeyError:  
             pass
-    X=df.drop(['log2FC'],1)#activity_score
+    X=df.drop(['log2FC'],1)
     dataset_col=np.array(X['dataset'],dtype=int)  
     headers=list(X.columns.values)
 
@@ -246,24 +246,22 @@ def main():
     df1 = df1.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     df1['dataset']=[0]*df1.shape[0]
     open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n"% (datasets[0],df1.shape[0]))
-    if len(datasets)>1:       
-        df2=pandas.read_csv(datasets[1],sep="\t")
-        df2 = df2.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-        df2['dataset']=[1]*df2.shape[0]
-        open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[1],df2.shape[0]))
-        if len(datasets)==3:
-            df3=pandas.read_csv(datasets[2],sep="\t")
-            df3 = df3.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-            df3['dataset']=[2]*df3.shape[0]
-            df2=df2.append(df3,ignore_index=True)  
-            open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],df3.shape[0]))
-        training_df=df1.append(df2,ignore_index=True)  
-        training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-    else:
-        training_df=df1
+    df2=pandas.read_csv(datasets[1],sep="\t")
+    df2 = df2.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
+    df2['dataset']=[1]*df2.shape[0]
+    open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[1],df2.shape[0]))
+    df3=pandas.read_csv(datasets[2],sep="\t")
+    df3 = df3.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
+    df3['dataset']=[2]*df3.shape[0]
+    df2=df2.append(df3,ignore_index=True)  
+    open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],df3.shape[0]))
+    training_df=df1.append(df2,ignore_index=True)  
+    training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
+    #dropping unnecessary features and encode sequence features
     X,y,feat_type,headers,guideids, guide_sequence_set,dataset_col=DataFrame_input(training_df)
     open(output_file_name + '/log.txt','a').write("Data input Time: %s seconds\n\n" %('{:.2f}'.format(time.time()-start_time)))  
+    #adding guideid and dataset column for covenient train-test split
     X_df=pandas.DataFrame(data=np.c_[X,y,guideids,dataset_col],columns=headers+['log2FC','guideid','dataset_col'])
         
     guideid_set=list(set(guideids))

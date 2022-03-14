@@ -92,7 +92,7 @@ except:
 datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
 
-def self_encode(sequence):
+def self_encode(sequence):#one-hot encoding for single nucleotide features
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
     nts=['A','T','C','G']
     for i in range(len(sequence)):
@@ -100,7 +100,7 @@ def self_encode(sequence):
     sequence_one_hot_encoded = integer_encoded.flatten()
     return sequence_one_hot_encoded
 
-def dinucleotide(sequence):
+def dinucleotide(sequence):#encoding for dinucleotide features
     nts=['A','T','C','G']
     items=list(itertools.product(nts,repeat=2))
     dinucleotides=list(map(lambda x: x[0]+x[1],items))
@@ -129,13 +129,13 @@ def DataFrame_input(df):
         for j in df_gene.index:
             df.at[j,'Nr_guide']=df_gene.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])       
-    df=df[df['Nr_guide']>=5]
+    df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
     log2FC=np.array(df['log2FC'],dtype=float)
     sequences=list(dict.fromkeys(df['sequence']))
-    ### one hot encoded sequence features
     for i in df.index:
         df.at[i,'geneid']=int(df['geneid'][i][1:])
         df.at[i,'guideid']=sequences.index(df['sequence'][i])
+    #define guideid based on chosen split method
     if split=='guide':
         guideids=np.array(list(df['guideid']))
     elif split=='gene':
@@ -149,6 +149,7 @@ def DataFrame_input(df):
             for j in gene_df.index:
                 df.at[j,'median']=median
                 df.at[j,'activity_score']=median-df['log2FC'][j]
+    # remove columns that are not used in training
     drop_features=['std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','gene_essentiality',
                    'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
@@ -163,7 +164,7 @@ def DataFrame_input(df):
     median=np.array(df['median'],dtype=float)
     dataset_col=np.array(df['dataset'],dtype=float)
     X=df.drop(['log2FC','activity_score','median'],1)
-    X['sequence_30nt'] = X.apply(lambda row : encode_sequence(row['sequence_30nt']), axis = 1)
+    X['sequence_30nt'] = X.apply(lambda row : encode_sequence(row['sequence_30nt']), axis = 1) #encode sequence features for DL 
     headers=list(X.columns.values)
     
     features=['dataset','geneid',"gene_5","gene_strand","gene_GC_content","distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_length","gene_expression_min","gene_expression_max"]#
@@ -232,16 +233,15 @@ def main():
     df2 = df2.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     df2['dataset']=[1]*df2.shape[0]
     open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[1],df2.shape[0]))
-    if len(datasets)==3:
-        df3=pandas.read_csv(datasets[2],sep="\t")
-        df3 = df3.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-        df3['dataset']=[2]*df3.shape[0]
-        df2=df2.append(df3,ignore_index=True)  
-        open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],df3.shape[0]))
-        # split into training and validation
+    df3=pandas.read_csv(datasets[2],sep="\t")
+    df3 = df3.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
+    df3['dataset']=[2]*df3.shape[0]
+    df2=df2.append(df3,ignore_index=True)  
+    open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],df3.shape[0]))
     training_df=df1.append(df2,ignore_index=True)  
     training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
+    #dropping unnecessary features and encode sequence features
     X,y,headers,dataset_col,log2FC,median,guideids, guide_sequence_set = DataFrame_input(training_df)
     open(output_file_name + '/log.txt','a').write("Data input Time: %s seconds\n\n" %('{:.2f}'.format(time.time()-start_time)))  
     
@@ -256,7 +256,6 @@ def main():
     evaluations=defaultdict(list)
     iteration_predictions=defaultdict(list)
     kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
-    # for train_index, test_index in kf.split(X_rescaled,y):
     X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,median,guideids,dataset_col],
                               columns=headers+['activity','log2FC','median','guideid','dataset_col'])
     fold_inner=0
@@ -281,16 +280,11 @@ def main():
         y_val=X_val['activity']
         X_val=X_val[headers]
         
-        # from sklearn.preprocessing import StandardScaler
-        # scaler=StandardScaler()
-        # X_train=pandas.DataFrame(np.c_[scaler.fit_transform(X_train[header]),X_train['sequence_30nt']],columns=header+['sequence_30nt'])
-        # X_val=pandas.DataFrame(np.c_[scaler.transform(X_val[header]),X_val['sequence_30nt']],columns=header+['sequence_30nt'])
-        # X_test=pandas.DataFrame(np.c_[scaler.transform(X_test[header]),X_test['sequence_30nt']],columns=header+['sequence_30nt'])
-        
-        
         SCALE = StandardScaler()
         
         X_train[header] = SCALE.fit_transform(X_train[header])
+        filename = output_file_name+'/SCALEr.sav'
+        pickle.dump(SCALE, open(filename, 'wb'))
         X_val[header] = SCALE.transform(X_val[header])
         X_test[header] = SCALE.transform(X_test[header])
         
@@ -336,10 +330,10 @@ def main():
     
     
         predictions_test = estimator.predict(
-        model=trained_model,
-        dataloaders=loader_test,
-        return_predictions=True,
-        ckpt_path=filename_model)
+                                    model=trained_model,
+                                    dataloaders=loader_test,
+                                    return_predictions=True,
+                                    ckpt_path=filename_model)
         #print(len(predictions_test))
         predictions = predictions_test[0].cpu().numpy().flatten()
         fold_inner+=1
@@ -362,8 +356,6 @@ def main():
                 log2FC_test_1=np.array(dataset1['log2FC'],dtype=float)
                 median_test_1=np.array(dataset1['median'],dtype=float)
                 
-                # X_test_1=pandas.DataFrame(np.c_[scaler.transform(X_test_1[header]),X_test_1['sequence_30nt']],columns=header+['sequence_30nt'])
-
                 loader_test = CrisprDatasetTrain(X_test_1, y_test_1, header)
                 loader_test = DataLoader(loader_test, batch_size=X_test_1.shape[0], shuffle = False)
                 predictions_test = estimator.predict(
@@ -412,7 +404,6 @@ def main():
                 save_top_k = 1,
                 mode = 'min',)
     estimator = pl.Trainer( callbacks=[early_stop_callback,checkpoint_callback], max_epochs=max_epochs, check_val_every_n_epoch=1, logger=True,progress_bar_refresh_rate = 0, weights_summary=None)
-    filename_model = output_file_name + '/model_all' + ".ckpt"
     if choice=='cnn':
         estimator.fit(Crispr1DCNN(len(header)), train_dataloader = loader_train, val_dataloaders = loader_val) 
     elif choice=='gru':

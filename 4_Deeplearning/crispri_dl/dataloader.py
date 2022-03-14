@@ -24,7 +24,6 @@ class CrisprDatasetTrain(Dataset):
         return self.X_features.shape[0]
 
     def __getitem__(self, idx):
-
         x_sequence_40nt = torch.FloatTensor(self.X_sequence_40nt.iloc[idx].tolist())
         x_features = torch.FloatTensor(self.X_features.iloc[idx].tolist())
 
