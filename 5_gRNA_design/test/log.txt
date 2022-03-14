@@ -1,6 +1,8 @@
-2022-03-14 14:02:17,737 - Python script: CRISPRi_design_MERF.py
+2022-03-14 14:28:35,066 - Python script: CRISPRi_design_MERF.py
 
-2022-03-14 14:02:17,738 - Parsed arguments: Namespace(PAM='NGG', biotype='all', fasta='test.fasta', gff=None, length=20, maxgc=85, mingc=30, output='test', shap='no', targeting_genes=None)
+2022-03-14 14:28:35,066 - Parsed arguments: Namespace(PAM='NGG', biotype='all', fasta='test.fasta', gff=None, length=20, maxgc=85, mingc=30, output='test', shap='no', targeting_genes=None)
 
-
-2022-03-14 14:02:25,803 - Execution Time: 8.76 seconds
+2022-03-14 14:28:35,075 - The number of gRNAs for test: 16
+2022-03-14 14:28:35,075 - The number of gRNAs for test2: 44
+2022-03-14 14:28:35,354 - NumExpr defaulting to 8 threads.
+2022-03-14 14:28:43,218 - Execution Time: 9.02 seconds

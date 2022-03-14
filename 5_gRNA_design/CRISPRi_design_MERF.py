@@ -36,7 +36,7 @@ Example: python CRISPRi_design_MERF.py test.fasta -o test
 
 It also supports to select multiple genes in a genome for design by input reference genome fasta as FASTA input and the gff3 file for the reference genome.   
 
-Example: python CRISPRi_design_MERF.py NC_000913.3.fasta -gff NC_000913.3.gff3 -targeting_genes purA,purB -shap no -o purs
+Example: python CRISPRi_design_MERF.py NC_000913.3.fasta -gff NC_000913.3.gff3 -targeting_genes purA,b1131 -shap no -o purs
                   """)
 parser.add_argument("fasta", help="fasta file")
 parser.add_argument("-gff", default=None,help="gff file")
@@ -195,6 +195,7 @@ def gRNA_search(targeting_genes):
         for gene in genes:
             gene.update({'SequenceID':gene['gene_name']})
             library_guides[gene['gene_name']+"_"+str(gene['start'])+"_"+str(gene['end'])]=gRNA_sequences(gene["seq_flanking"],l,mingc,maxgc,gene,reference_FASTA,PAM,gene['gene_name']+"_"+str(gene['start'])+"_"+str(gene['end']))  #gene["geneid"]+"_"+gene["start"] for pseudogenes with same locus tag and name but different position
+            logging.info("The number of gRNAs for %s: %s"%(gene['gene_name'], len(library_guides[gene['gene_name']+"_"+str(gene['start'])+"_"+str(gene['end'])])))
             print("Done designing gRNAs for %s, number of gRNAs: %s"%(gene['gene_name'], len(library_guides[gene['gene_name']+"_"+str(gene['start'])+"_"+str(gene['end'])])))
     else:
         tasknames=targeting_genes
@@ -202,6 +203,7 @@ def gRNA_search(targeting_genes):
         for taskname in tasknames.keys():
             gene={'SequenceID':taskname,"start":1,"end":len(tasknames[taskname]),"strand":"+","length":len(tasknames[taskname]),"GC_content":float((tasknames[taskname].count('G') + tasknames[taskname].count('C'))) / len(tasknames[taskname]) * 100}
             library_guides[taskname]=gRNA_sequences("N"*20+tasknames[taskname],l,mingc,maxgc,gene,tasknames[taskname],PAM,taskname)
+            logging.info("The number of gRNAs for %s: %s"%(taskname, len(library_guides[taskname])))
             print("Done designing gRNAs for %s, number of gRNAs: %s"%(taskname, len(library_guides[taskname])))
     return library_guides
 
@@ -446,7 +448,7 @@ if __name__ == '__main__':
     logging_file= output_file_name + '/log.txt'
     logging.basicConfig(filename=logging_file,format='%(asctime)s - %(message)s', level=logging.INFO)
     logging.info("Python script: %s\n"%sys.argv[0])
-    logging.info("Parsed arguments: %s\n\n"%args)
+    logging.info("Parsed arguments: %s\n"%args)
     print("Start designing at %s"%time.asctime())
     ReferenceGenomeInfo(fasta,genome_gff)
     if targeting_genes != None and genome_gff == None:
