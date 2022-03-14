@@ -1,0 +1,6 @@
+2022-03-14 14:02:17,737 - Python script: CRISPRi_design_MERF.py
+
+2022-03-14 14:02:17,738 - Parsed arguments: Namespace(PAM='NGG', biotype='all', fasta='test.fasta', gff=None, length=20, maxgc=85, mingc=30, output='test', shap='no', targeting_genes=None)
+
+
+2022-03-14 14:02:25,803 - Execution Time: 8.76 seconds

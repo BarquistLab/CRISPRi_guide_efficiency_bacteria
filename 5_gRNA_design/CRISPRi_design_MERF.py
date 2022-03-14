@@ -9,9 +9,10 @@ Created on Tue Sep 24 17:45:36 2019
 import matplotlib.pyplot as plt
 import numpy as np
 from Bio.Seq import Seq
+from Bio import SeqIO
+import regex as re
 import os
 import time 
-import seaborn as sns
 import logging
 import itertools
 import pandas 
@@ -21,150 +22,115 @@ import argparse
 import sys
 import warnings
 warnings.filterwarnings('ignore')
+start_time=time.time()
 class MyParser(argparse.ArgumentParser):
     def error(self, message):
         sys.stderr.write('error: %s\n' % message)
         self.print_help()
         sys.exit(2)
+
 parser = MyParser(usage='python %(prog)s datasets [options]',formatter_class=argparse.RawTextHelpFormatter,description="""
-This is used to design gRNAs from FASTA input file and predict gRNA efficiency  
+This is used to design gRNAs for FASTA input files and predict gRNA efficiency using trained MERF model.
 
-Example: python median_subtracting_model.py -training 0,1,2 -c rf -o test
+Example: python CRISPRi_design_MERF.py test.fasta -o test
+
+It also supports to select multiple genes in a genome for design by input reference genome fasta as FASTA input and the gff3 file for the reference genome.   
+
+Example: python CRISPRi_design_MERF.py NC_000913.3.fasta -gff NC_000913.3.gff3 -targeting_genes purA,purB -shap no -o purs
                   """)
-parser.add_argument("-training", type=str, default='0,1,2', 
-                    help="""
-Which datasets to use: 
-    0: E75 Rousset
-    1: E18 Cui
-    2: Wang
-    0,1: E75 Rousset & E18 Cui
-    0,2: E75 Rousset & Wang
-    1,2: E18 Cui & Wang
-    0,1,2: all 3 datasets
-default: 0,1,2""")
-parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
-parser.add_argument("-c", "--choice", default="rf", help="If train on random forest or LASSO model, rf/lasso. default: rf")
-parser.add_argument("-s", "--split", default='guide', help="train-test split stratege. guide/gene/guide_dropdistance. guide_dropdistance: To test the models without distance associated features. default: guide")
-parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
-parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
-
+parser.add_argument("fasta", help="fasta file")
+parser.add_argument("-gff", default=None,help="gff file")
+parser.add_argument("-targeting_genes",default=None,help="gene name or gene ID of targeting genes (such as thrL, b0001), multiple genes separated by ','. If None, target all genes in gff file. Default: None")
+parser.add_argument("-o", "--output", default="results", help="output folder name. Default: results")
+parser.add_argument("-l","--length", type=int, default=20, help="Length of gRNA (bp). Default: 20")
+parser.add_argument("-maxgc", type=float, default=85, help="Maximal GC content of gRNA. Default: 85")
+parser.add_argument("-mingc", type=float, default=30, help="Minimal GC content of gRNA. Default: 30")
+parser.add_argument("-b","--biotype", type=str, default="all", help="Targeting gene type. all/protein_coding/rRNA/tRNA/ncRNA/pseudogene. Default: all")
+parser.add_argument("-PAM", type=str,default='NGG', help="PAM sequence. Default: NGG")
+parser.add_argument("-shap", type=str,default='no', help="If output SHAP value summary plots, yes/no. (Calculating SHAP values takes much longer.) Default: no")
 args = parser.parse_args()
+fasta=args.fasta
+genome_gff=args.gff
+targeting_genes=args.targeting_genes
+if targeting_genes != None:
+    targeting_genes=targeting_genes.split(",")
+        
+output_file_name = args.output
+l=args.length
+maxgc = args.maxgc 
+mingc = args.mingc
+biotype=args.biotype
+PAM=args.PAM
+SHAP_plots=args.shap
+if biotype == "all":
+    biotypes=["protein_coding","rRNA","tRNA","ncRNA","pseudogene"]
+else:
+    if biotype not in ["protein_coding","rRNA","tRNA","ncRNA","pseudogene"]:
+        print("Please choose ONE of the biotype or all..\nAbort.")   
+        sys.exit()
+    biotypes=[biotype]
 
-def main():
-    start_time=time.time()
-    global  l, maxgc, mingc, PAM, SHAP_plots,t,output_file_name
-    t=time.time()
-    t=int(t)
-    os.mkdir("static/%s" %(t))
-    output_file_name="static/%s" %(t)
-    genome_fasta=request.form['seq']
+if SHAP_plots not in ['yes','no']:
+    print("Please input valid choice for -shap..\nAbort.")   
+    sys.exit()
+try:
+    os.mkdir(output_file_name)
+except:
+    overwrite=input("File exists, do you want to overwrite? (y/n)")
+    if overwrite == "y":
+        os.system("rm -r %s"%output_file_name)
+        os.mkdir(output_file_name)
+    elif overwrite =="n":
+        output_file_name=input("Please give a new output file name:")
+        os.mkdir(output_file_name)
+    else:
+        print("Please input valid choice..\nAbort.")    
+        sys.exit()
+def ReferenceGenomeInfo(fasta,genome_gff):
+    if genome_gff == None:
+        global tasknames
+        tasknames=dict()
+        fasta_sequences = list(SeqIO.parse(open(fasta),'fasta'))
+        if len(fasta_sequences) == 0:
+            print("Error: No sequences found in input file. Please input file in FASTA format.")
+            sys.exit()
+        for fasta in fasta_sequences:  # input reference genome
+            tasknames.update({fasta.id:fasta.seq })
+        
     
-    genome_gff=None
-    l=request.form['length']
-    l=int(l)
-    maxgc=request.form['maxgc']
-    maxgc=int(maxgc)
-    mingc=request.form['mingc']
-    mingc=int(mingc)
-    PAM=request.form['PAM']
-    # blast_db=request.form['blast_db']
-    # if blast_db == None:
-    #     blast_db=genome_fasta.copy()
-#    biotype=request.form['biotype']
-#    if biotype == "all":
-#            biotypes=["protein_coding","rRNA","tRNA","ncRNA","pseudogene"]
-#    else:
-#        biotypes=[biotype]
-    SHAP_plots=request.form['shap']
-    render_template('index.html',test=genome_fasta)
-    error=ReferenceGenomeInfo(genome_fasta,genome_gff)
-    if error != "":
-        return render_template('index.html',test=genome_fasta,error =error)
-    else:
-        render_template('index.html',test=genome_fasta)
-    library_guides=gRNA_search(reference_fasta)   
-    guides=[]
-    for gene in library_guides.keys():
-        for guide in library_guides[gene]:
-            guides.append(guide)
-    if len(guides)==0:
-        error="Error: No gRNA was found"
-        return render_template('index.html',test=genome_fasta,error2 =error)
-    
-    guides_df=MachineLearning(guides)
-    if SHAP_plots == 'yes':
-        print("Execution Time: %s seconds" %('{:.2f}'.format(time.time()-start_time)))
-        return render_template('result.html',test=genome_fasta,data=guides_df.to_html(index=False),total=guides_df.shape[0],seq_length=len(genome_fasta),length=l,maxgc=maxgc,mingc=mingc,PAM=PAM,t=t)   
-    else:
-        print("Execution Time: %s seconds" %('{:.2f}'.format(time.time()-start_time)))
-        return render_template('result2.html',test=genome_fasta,data=guides_df.to_html(index=False),total=guides_df.shape[0],seq_length=len(genome_fasta),length=l,maxgc=maxgc,mingc=mingc,PAM=PAM,t=t)   
+    if genome_gff != None:
+        global reference_genes,reference_FASTA
+        fasta_sequences = list(SeqIO.parse(open(fasta),'fasta'))
+        for fasta in fasta_sequences:  # input reference genome
+            reference_fasta=fasta.seq 
+        reference_FASTA=Seq(re.sub('[^ATCG]','N',str(reference_fasta).upper()))
+        reference_genes=[]
+        for line in open(genome_gff):
+           if "#" not in line and "Gene;gene" in line: ## input reference gff
+               line=line.replace("\n","")    
+               row=line.split("\t")
+               gene_biotype=row[8].split("gene_biotype=")[1].split(";")[0]
+               if gene_biotype in biotypes:
+                   geneid=row[8].split(";")[0].split("-")[1]
+                   genename=row[8].split("Name=")[1].split(";")[0]
+                   start=int(row[3])
+                   end=int(row[4])
+                   strand=row[6]
+                   length=int(row[4])-int(row[3])+1
+                   seq=reference_FASTA[int(start)-1:int(end)]
+                   GC_content = '{:.2f}'.format((seq.count('G') + seq.count('C')) / len(seq) * 100)
+                   if row[6]=="+":
+                       seq_flanking=reference_FASTA[int(start)-1-20:int(end)]
+                       seq_5_3=seq
+                       seq_5_3_flanking=seq_flanking
+                   elif row[6]=="-":
+                       seq_flanking=reference_FASTA[int(start)-1:int(end)+20]
+                       seq_5_3=seq.reverse_complement()
+                       seq_5_3_flanking=seq_flanking.reverse_complement()
+                   reference_genes.append({"gene_name":genename,"geneid":geneid,"start":start,"end":end,"strand":strand,"length":length,"seq":seq_5_3,"seq_flanking":seq_5_3_flanking,"GC_content":GC_content,"biotype":gene_biotype})   
 
-def ReferenceGenomeInfo(genome_fasta,genome_gff):
-    global reference_fasta, reference_genes,taskname
-    error=""
-#    try: 
-#        fasta_sequences = list(SeqIO.parse(open(genome_fasta),'fasta'))
-#        if len(fasta_sequences) == 0:
-#            error="Error: Please upload file in FASTA format."
-#            return error
-#        for fasta in fasta_sequences:  # input reference genome
-#            reference_fasta=fasta.seq 
-#            if genome_gff == None:
-#                taskname=fasta.id
-#            break
-#    except:
-    genome_fasta=genome_fasta.replace("\r","")
-    if genome_fasta=="" or genome_fasta[0] != ">":
-        genome_fasta=genome_fasta.replace("\n","")
-        reference_fasta=Seq(genome_fasta.upper())
-        taskname=""
-    else:
-        reference_fasta=Seq("".join(genome_fasta.split("\n")[1:]).upper())
-        taskname=genome_fasta.split("\n")[0][1:]
-    if reference_fasta == "":
-        error="Error: Please input sequence in FASTA format or only sequence."
-        return error
-    if len(reference_fasta) > 25000:
-        error="Error: Please input sequence shorter than 25,000 bp."
-        return error
-    if any(bp not in ['A','T','C','G'] for bp in reference_fasta):
-        error="Error: There are non-ATCG characters in the input sequence. (Only one sequnce is accepted, please avoid multiple FASTA inputs.)"
-        return error
-#    if genome_gff != None:
-#        reference_genes=[]
-#        for line in open(genome_gff):
-#           if "#" not in line and "Gene;gene" in line: ## input reference gff
-#               line=line.replace("\n","")    
-#               row=line.split("\t")
-#               gene_biotype=row[8].split("gene_biotype=")[1].split(";")[0]
-#               if gene_biotype in ["protein_coding","rRNA","tRNA","ncRNA","pseudogene"]:
-#                   geneid=row[8].split(";")[0].split("-")[1]
-#                   genename=row[8].split("Name=")[1].split(";")[0]
-#                   start=int(row[3])
-#                   end=int(row[4])
-#                   strand=row[6]
-#                   length=int(row[4])-int(row[3])+1
-#                   seq=reference_fasta[int(start)-1:int(end)]
-#                   GC_content = '{:.2f}'.format((seq.count('G') + seq.count('C')) / len(seq) * 100)
-#                       
-#                   if row[6]=="+":
-#                       seq_flanking=reference_fasta[int(start)-1-20:int(end)]
-#                       seq_5_3=seq
-#                       seq_5_3_flanking=seq_flanking
-#                       operon_5=start
-#                       operon_3=end
-#                   elif row[6]=="-":
-#                       seq_flanking=reference_fasta[int(start)-1:int(end)+20]
-#                       seq_5_3=seq.reverse_complement()
-#                       seq_5_3_flanking=seq_flanking.reverse_complement()
-#                       operon_5=end
-#                       operon_3=start
-#                   operon_downstream_genes=[]
-#                   ess_gene_operon=[]
-#                   reference_genes.append({"gene_name":genename,"geneid":geneid,"start":start,"end":end,"strand":strand,"length":length,"seq":seq_5_3,"seq_flanking":seq_5_3_flanking,"GC_content":GC_content,"biotype":gene_biotype,"operon_5":operon_5,"operon_3":operon_3,"operon_downstream_genes":operon_downstream_genes,"ess_gene_operon":ess_gene_operon})   
-    return error
 
-def gRNA_sequences(seq,l,mingc,maxgc,gene,reference_fasta,PAM):  ## seq is sense strand sequence from 5' to 3', 
+def gRNA_sequences(seq,l,mingc,maxgc,gene,reference_fasta,PAM,taskname):  ## seq is sense strand sequence from 5' to 3', 
     PAM=PAM[::-1] # look for reverse complement sequence of PAM in sense strand
     reverse_complement={"G":"C","C":"G","A":"T","T":"A"}
     PAM_rev_com=""
@@ -175,7 +141,7 @@ def gRNA_sequences(seq,l,mingc,maxgc,gene,reference_fasta,PAM):  ## seq is sense
             PAM_rev_com=PAM_rev_com+reverse_complement[bp]
     PAM_s_rc=PAM_rev_com.replace('N','[ACGT]') 
     PAMs=PAM_s_rc
-    guide=[]   
+    guide=list()
     if seq[:20]== 'N'*20:
         p=20
     else:
@@ -218,25 +184,28 @@ def gRNA_sequences(seq,l,mingc,maxgc,gene,reference_fasta,PAM):  ## seq is sense
 
 
 def gRNA_search(targeting_genes):
-#    if type(targeting_genes)==list:
-#        genes=[]
-#        for gene in targeting_genes:
-#            if type(gene)==str:
-#                for GENE in reference_genes:
-#                    if GENE['gene_name']== gene:
-#                        genes.append(GENE)
-#            elif type(gene)==dict:
-#                genes.append(gene)
-#        library_guides={}
-#        for gene in genes:
-#            library_guides[gene['gene_name']+"_"+str(gene['start'])+"_"+str(gene['end'])]=gRNA_sequences(gene["seq_flanking"],l,mingc,maxgc,gene,reference_fasta,PAM)  #gene["geneid"]+"_"+gene["start"] for pseudogenes with same locus tag and name but different position
-#    else:
-    library_guides={}
-    gene={'SequenceID':taskname,"start":1,"end":len(targeting_genes),"strand":"+","length":len(targeting_genes),"GC_content":float((targeting_genes.count('G') + targeting_genes.count('C'))) / len(targeting_genes) * 100}
-    library_guides[taskname]=gRNA_sequences("N"*20+targeting_genes,l,mingc,maxgc,gene,targeting_genes,PAM)
+    if type(targeting_genes)==list:
+        genes=[]
+        for gene in targeting_genes:
+            if type(gene)==str:
+                for GENE in reference_genes:
+                    if GENE['gene_name']== gene or GENE['geneid']==gene:
+                        genes.append(GENE)
+        library_guides={}
+        for gene in genes:
+            gene.update({'SequenceID':gene['gene_name']})
+            library_guides[gene['gene_name']+"_"+str(gene['start'])+"_"+str(gene['end'])]=gRNA_sequences(gene["seq_flanking"],l,mingc,maxgc,gene,reference_FASTA,PAM,gene['gene_name']+"_"+str(gene['start'])+"_"+str(gene['end']))  #gene["geneid"]+"_"+gene["start"] for pseudogenes with same locus tag and name but different position
+            print("Done designing gRNAs for %s, number of gRNAs: %s"%(gene['gene_name'], len(library_guides[gene['gene_name']+"_"+str(gene['start'])+"_"+str(gene['end'])])))
+    else:
+        tasknames=targeting_genes
+        library_guides={}
+        for taskname in tasknames.keys():
+            gene={'SequenceID':taskname,"start":1,"end":len(tasknames[taskname]),"strand":"+","length":len(tasknames[taskname]),"GC_content":float((tasknames[taskname].count('G') + tasknames[taskname].count('C'))) / len(tasknames[taskname]) * 100}
+            library_guides[taskname]=gRNA_sequences("N"*20+tasknames[taskname],l,mingc,maxgc,gene,tasknames[taskname],PAM,taskname)
+            print("Done designing gRNAs for %s, number of gRNAs: %s"%(taskname, len(library_guides[taskname])))
     return library_guides
 
-
+###functions to encode sequence features and calculate features necessary for prediction of gRNA efficiency scores
 def self_encode(sequence):
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
     nts=['A','T','C','G']
@@ -304,7 +273,7 @@ def MFE_folding(sequence):
     subprocess.run(["rm",output_file_name + '/folding.txt',output_file_name+"/MFE_folding.fasta"])
     return MFE
 
-
+## predict gRNA efficiency
 def MachineLearning(guides):
     MachineLearning_ModelTraining()
     guides_df=MachineLearning_Transform(guides)
@@ -313,8 +282,6 @@ def MachineLearning(guides):
     chosen_header=["gRNA_ID","SequenceID","distance_start_codon","distance_start_codon_perc","guide_GC_content","coding_strand","seq_20nt","seq_full_length","PAM","predicted_log2FC","Warning"]
     if l == 20:
         chosen_header.remove("seq_full_length")
-    if taskname=="":
-        chosen_header.remove("SequenceID")
     if all(guides_df['Warning']==""):
         chosen_header.remove("Warning")
     guides_df=guides_df[chosen_header]
@@ -326,7 +293,7 @@ def MachineLearning(guides):
     if "seq_full_length" in guides_df.columns.values.tolist():
         guides_df=guides_df.rename(columns={"seq_full_length":"gRNA sequence with desired length"})
     guides_df=guides_df.sort_values(by="Activity score",ascending=True)
-    guides_df.to_csv("static/%s/"%t+"gRNAs.csv",sep='\t',index=False)
+    guides_df.to_csv(output_file_name+"/"+"gRNAs.csv",sep='\t',index=False)
     return guides_df
 
 def MachineLearning_ModelTraining():
@@ -335,75 +302,18 @@ def MachineLearning_ModelTraining():
     headers=pickle.load(open('/'.join(os.path.abspath(__file__).split('/')[:-1])+'/saved_model/CRISPRi_headers.sav','rb'))
     estimator=pickle.load(open('/'.join(os.path.abspath(__file__).split('/')[:-1])+'/saved_model/CRISPRi_model.sav','rb'))
 
-def SHAP(estimator,X_unscaled,X,headers,name):
-    import shap
-    # import scipy.cluster
-    if os.path.isdir(name)==False:
-        os.mkdir(name)
-    # y = estimator.predict(X)
-    X=pandas.DataFrame(X,columns=headers)
-    X=X.astype(float)
-    X=X[:3000]
-    explainer = shap.TreeExplainer(estimator)
-    # pickle.dump(explainer,open('/'.join(os.path.abspath(__file__).split('/')[:-1])+'/saved_model/SHAPexplainer.sav','wb'))
-    # explainer=pickle.load(open('/'.join(os.path.abspath(__file__).split('/')[:-1])+'/saved_model/SHAPexplainer.sav','rb'))
-    shap_values = explainer.shap_values(X)
-    values=pandas.DataFrame(shap_values,columns=headers,index=map(str,X_unscaled['gRNA_ID'][:3000]))
-    values.to_csv("static/"+name.split("/")[1]+"/shap_values.csv",index=True,sep='\t')
-    if os.path.isdir(name)==False:
-        os.mkdir(name)
-    shap.save_html(name+'/all_force_plots.html',shap.force_plot(explainer.expected_value, shap_values, X,show= False))
     
-    plt.figure()
-    shap.summary_plot(shap_values, X, plot_type="bar",show=False,color_bar=True,max_display=10)
-    plt.yticks(fontsize='small')
-    plt.subplots_adjust(left=0.25, top=0.95)
-    plt.savefig(name+"/shap_value_bar.png",dpi=400)
-    plt.close()
-    plt.figure()
-    shap.summary_plot(shap_values, X,show=False,max_display=10)
-    plt.subplots_adjust(left=0.25, top=0.95)
-    plt.yticks(fontsize='small')
-    plt.savefig(name+"/shap_value.png",dpi=400)
-    plt.close()
-    
-#    genes=list(set(X_unscaled['gene_name']))
-    # D=pandas.DataFrame(shap_values,columns=headers)
-    # values=pandas.DataFrame({'shap_values':np.mean(np.absolute(shap_values),axis=0),'features':headers})
-    # values=values.sort_values(by=["shap_values"],ascending=False)
-    # features=list(values["features"].head(20))
-    # D=D[features]
-    # D=D.transpose()
-    # plt.figure()
-    # d = scipy.spatial.distance.pdist(shap_values, 'sqeuclidean')
-    # clustOrder = scipy.cluster.hierarchy.leaves_list(scipy.cluster.hierarchy.complete(d))
-    # logging.info('cluster order: %s\n'%clustOrder)
-    # sns.heatmap(D[clustOrder],yticklabels=1,xticklabels=False,cmap="vlag",vmin=-0.5,vmax=0.5,cbar_kws={'label': 'SHAP value'})
-    # plt.subplots_adjust(left=0.35,right=0.9)
-    # plt.xlabel('samples')
-    # plt.savefig(name+'/heatmap.png',dpi=400)
-    # plt.close()
-    # D=D.transpose()
-    # D['pos']=[ "%s_%s_%s"%(a,b,c) for a,b,c in zip(list(map(str,X_unscaled['SequenceID'])),list(map(int,X_unscaled['distance_start_codon'])),list(np.around(y,decimals=2)))]
-    # D.set_index('pos',inplace=True)
-    subprocess.run(['tar','cvzf','static/%s/SHAP_plots.tar.gz'%t,name])     
-    
-def MachineLearning_Predict(guides_df):
-    guide_df_sub=guides_df[headers]
-    prediction=estimator.predict(guide_df_sub)
-    guides_df['predicted_log2FC']=prediction
-    if SHAP_plots == "yes":
-        SHAP(estimator,guides_df,guide_df_sub,headers,'static/%s/SHAP_plots'%t)
-    cols=guides_df.columns.values.tolist()
-    cols=['predicted_log2FC']+cols[:-1]
-    guides_df=guides_df[cols]
-    return guides_df 
-
-def MachineLearning_Transform(guides):
+def MachineLearning_Transform(library):
+    guides=[]
+    for gene in library.keys():
+        for guide in library[gene]:
+            guides.append(guide)
     index=range(len(guides))
+    if len(guides)==0:
+        print("Error: No gRNA was found")
+        sys.exit()
     column=["gRNA_ID","SequenceID","start","end","gene_strand","length","genome_pos","seq_20nt","seq_full_length","PAM","Warning","coding_strand"]+headers
     guides_df=pandas.DataFrame(index=index,columns=column)
-    # subprocess.run(["makeblastdb","-in",blast_db,"-dbtype","nucl"],stdout=subprocess.DEVNULL)
     for k in range(len(guides)):
         guide=guides[k]
         transformed_guide={}
@@ -411,6 +321,10 @@ def MachineLearning_Transform(guides):
         target_seq=str(Seq(sequence).reverse_complement())
         PAM=guide['PAM']
         guide_GC_content='{:.2f}'.format((sequence.count('G') + sequence.count('C')) / len(sequence) * 100)
+        if genome_gff == None:
+            reference_fasta=tasknames[guide['SequenceID']]
+        else:
+            reference_fasta=reference_FASTA
         if guide['gRNA_strand']=="+":
             genome_pos_5_end=int(guide['genome_pos'])
             genome_pos_3_end=genome_pos_5_end+len(sequence)-1
@@ -419,7 +333,8 @@ def MachineLearning_Transform(guides):
                 sequence_30nt='N'* (5-genome_pos_5_end)+str(reference_fasta[0:genome_pos_3_end+6])
             else:
                 sequence_30nt=reference_fasta[genome_pos_5_end-5:genome_pos_3_end+6]
-    
+            if len(sequence_30nt)<30:
+                sequence_30nt=sequence_30nt+"N"*(30-len(sequence_30nt))
         elif guide['gRNA_strand']=="-":
             genome_pos_3_end=int(guide['genome_pos'])
             genome_pos_5_end=genome_pos_3_end+len(sequence)-1
@@ -428,6 +343,8 @@ def MachineLearning_Transform(guides):
                 sequence_30nt='N'* (7-genome_pos_3_end)+str(reference_fasta[0:genome_pos_5_end+4])
             else:
                 sequence_30nt=reference_fasta[genome_pos_3_end-7:genome_pos_5_end+4].reverse_complement()
+            if len(sequence_30nt)<30:
+                sequence_30nt=sequence_30nt+"N"*(30-len(sequence_30nt))
         PAM_encoded=self_encode(PAM)
         sequence_encoded=self_encode(sequence)
         dinucleotide_encoded,N_warning=dinucleotide(sequence_30nt)
@@ -483,21 +400,70 @@ def MachineLearning_Transform(guides):
         guide_df=pandas.DataFrame(guide,index=[k])
         guides_df.update(guide_df)
     return guides_df
+    
+def MachineLearning_Predict(guides_df):
+    guide_df_sub=guides_df[headers]
+    prediction=estimator.predict(guide_df_sub)
+    guides_df['predicted_log2FC']=prediction
+    if SHAP_plots == "yes":
+        print("Start SHAP interpretation at %s"%time.asctime())
+        SHAP(estimator,guides_df,guide_df_sub,headers,output_file_name+'/SHAP_plots')
+    cols=guides_df.columns.values.tolist()
+    cols=['predicted_log2FC']+cols[:-1]
+    guides_df=guides_df[cols]
+    return guides_df 
 
-@app.errorhandler(404)
-def error_404(error):
-	return render_template('errors/404.html'), 404
-
-
-@app.errorhandler(403)
-def error_403(error):
-	return render_template('errors/403.html'), 403
-
-
-@app.errorhandler(500)
-def error_500(error):
-	return render_template('errors/500.html'), 500
-
+def SHAP(estimator,X_unscaled,X,headers,name):
+    import shap
+    if os.path.isdir(name)==False:
+        os.mkdir(name)
+    X=pandas.DataFrame(X,columns=headers)
+    X=X.astype(float)
+    X=X[:3000]
+    explainer = shap.TreeExplainer(estimator)
+    # pickle.dump(explainer,open('/'.join(os.path.abspath(__file__).split('/')[:-1])+'/saved_model/SHAPexplainer.sav','wb'))
+    # explainer=pickle.load(open('/'.join(os.path.abspath(__file__).split('/')[:-1])+'/saved_model/SHAPexplainer.sav','rb'))
+    shap_values = explainer.shap_values(X)
+    values=pandas.DataFrame(shap_values,columns=headers,index=map(str,X_unscaled['gRNA_ID'][:3000]))
+    values.to_csv(name+"/shap_values.csv",index=True,sep='\t')
+    if os.path.isdir(name)==False:
+        os.mkdir(name)
+    shap.save_html(name+'/all_force_plots.html',shap.force_plot(explainer.expected_value, shap_values, X,show= False))
+    
+    plt.figure()
+    shap.summary_plot(shap_values, X, plot_type="bar",show=False,color_bar=True,max_display=10)
+    plt.yticks(fontsize='small')
+    plt.subplots_adjust(left=0.25, top=0.95)
+    plt.savefig(name+"/shap_value_bar.png",dpi=400)
+    plt.close()
+    plt.figure()
+    shap.summary_plot(shap_values, X,show=False,max_display=10)
+    plt.subplots_adjust(left=0.25, top=0.95)
+    plt.yticks(fontsize='small')
+    plt.savefig(name+"/shap_value.png",dpi=400)
+    plt.close()
 if __name__ == '__main__':
-    app.run(debug=False)
+    logging_file= output_file_name + '/log.txt'
+    logging.basicConfig(filename=logging_file,format='%(asctime)s - %(message)s', level=logging.INFO)
+    logging.info("Python script: %s\n"%sys.argv[0])
+    logging.info("Parsed arguments: %s\n\n"%args)
+    print("Start designing at %s"%time.asctime())
+    ReferenceGenomeInfo(fasta,genome_gff)
+    if targeting_genes != None and genome_gff == None:
+        print('Error: GFF file must be uploaded for selecting targeting genes')
+        sys.exit()
+    if targeting_genes != None and genome_gff != None:
+        
+        library_guides=gRNA_search(targeting_genes)
+    elif targeting_genes == None and genome_gff != None:
+        library_guides=gRNA_search(reference_genes)
+    elif targeting_genes == None and genome_gff == None:
+        library_guides=gRNA_search(tasknames) 
+    if len(library_guides)==0:
+        print("Error: No gRNA was found")
+        sys.exit()
+    print("Start gRNA efficiency prediction at %s"%time.asctime())
+    MachineLearning(library_guides)
+    logging.info("Execution Time: %s seconds" %('{:.2f}'.format(time.time()-start_time)))
+    print("Done at %s"%time.asctime())
     
