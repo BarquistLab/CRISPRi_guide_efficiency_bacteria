@@ -40,13 +40,13 @@ The choice of different training dataset(s) can be specified with option **"-tra
 
 ### 5_gRNA_design
 
-It contains 1 Python scripts for gRNA desgin and efficiency prediction similar to the webpage interface (ciao.helmholtz-hiri.de). It extends the function to design gRNAs for multiple sequences from FASTA input file and selected genes by gene name or gene ID when GFF file and reference genome FASTA are provided.
+It contains 1 Python scripts for gRNA desgin and efficiency prediction similar to the webpage interface (https://ciao.helmholtz-hiri.de). It extends the function to design gRNAs for multiple sequences from FASTA input file and selected genes by gene name or gene ID when GFF file and reference genome FASTA are provided.
 
 Requirements can be installed by creating a conda environment from the file "environment.yml".
-'''
-conda env create -f environment.yml
-conda activate guide_design
-'''
+```
+$ conda env create -f environment.yml
+  conda activate guide_design
+```
 To obtain conda, please see instructions: https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html
 
 
