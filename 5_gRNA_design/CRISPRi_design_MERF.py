@@ -290,7 +290,7 @@ def MachineLearning(guides):
     guides_df=guides_df.astype({"distance_start_codon":int,"coding_strand":str,"distance_start_codon_perc":float})
     guides_df=guides_df.round({"distance_start_codon_perc":2,"predicted_log2FC":4})
     guides_df=guides_df.rename(columns={"distance_start_codon":"Distance to start codon (bp)","distance_start_codon_perc":"Distance to start codon relative to the sequence length (%)",\
-                                "guide_GC_content":"GC content (%)","coding_strand":"If it targets coding strand","predicted_log2FC":"Activity score",\
+                                "guide_GC_content":"GC content (%)","coding_strand":"coding strand","predicted_log2FC":"Activity score",\
                                 "seq_20nt":"gRNA sequence (20nt)"})
     if "seq_full_length" in guides_df.columns.values.tolist():
         guides_df=guides_df.rename(columns={"seq_full_length":"gRNA sequence with desired length"})
