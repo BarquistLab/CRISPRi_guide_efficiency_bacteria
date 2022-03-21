@@ -8,21 +8,21 @@ Training dataset: all 3 datasets
 Number of guides for essential genes: 8099 
 Number of features: 9
 Features: sequence_30nt,guide_GC_content,distance_start_codon,distance_start_codon_perc,homopolymers,MFE_hybrid_full,MFE_hybrid_seed,MFE_homodimer_guide,MFE_monomer_guide
-Data input Time: 3.64 seconds
+Data input Time: 5.45 seconds
 
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ff4752329a0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ff474a6c940>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ff474a6ef40>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ff4747b0820>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ff474eea7f0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ff474a6cdc0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ff4736479a0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ff474f5bbe0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ff471d83880>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ff46e05caf0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e37af28b0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e3452aa00>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e377efc70>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e31066460>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e310529a0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e377e2310>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e37747df0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e3786a880>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e30c65a90>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e30a68550>
 Median Spearman correlation for all gRNAs of each gene: 
-E75 Rousset (median/mean): 0.39999999999999997 / 0.30765798390940174 
-E18 Cui (median/mean): 0.3689144189144189 / 0.26959626688028104 
-Wang (median/mean): 0.3142857142857143 / 0.2739350642726832 
-Mixed 3 datasets (median/mean): 0.35 / 0.2739350642726832 
-Execution Time: 259.87 seconds
+E75 Rousset (median/mean): 0.3571428571428572 / 0.3024548984101166 
+E18 Cui (median/mean): 0.32107843137254904 / 0.31036363070824985 
+Wang (median/mean): 0.2928571428571428 / 0.27404877445741305 
+Mixed 3 datasets (median/mean): 0.31085318350050717 / 0.27404877445741305 
+Execution Time: 889.41 seconds

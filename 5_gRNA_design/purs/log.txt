@@ -1,8 +1,0 @@
-2022-03-14 14:28:05,242 - Python script: CRISPRi_design_MERF.py
-
-2022-03-14 14:28:05,242 - Parsed arguments: Namespace(PAM='NGG', biotype='all', fasta='NC_000913.3.fasta', gff='NC_000913.3.gff3', length=20, maxgc=85, mingc=30, output='purs', shap='no', targeting_genes='purA,b1131')
-
-2022-03-14 14:28:05,377 - The number of gRNAs for purA: 66
-2022-03-14 14:28:05,378 - The number of gRNAs for purB: 92
-2022-03-14 14:28:05,659 - NumExpr defaulting to 8 threads.
-2022-03-14 14:28:27,010 - Execution Time: 22.67 seconds

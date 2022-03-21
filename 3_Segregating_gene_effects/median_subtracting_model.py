@@ -25,6 +25,8 @@ import pickle
 start_time=time.time()
 import warnings
 warnings.filterwarnings('ignore')
+sns.set_palette('Set2')
+dataset_labels=['E75 Rousset','E18 Cui','Wang']        
 class MyParser(argparse.ArgumentParser):
     def error(self, message):
         sys.stderr.write('error: %s\n' % message)
@@ -48,7 +50,7 @@ Which datasets to use:
 default: 0,1,2""")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
 parser.add_argument("-c", "--choice", default="rf", help="If train on random forest or LASSO model, rf/lasso. default: rf")
-parser.add_argument("-s", "--split", default='guide', help="train-test split stratege. guide/gene/guide_dropdistance. guide_dropdistance: To test the models without distance associated features. default: guide")
+parser.add_argument("-s", "--split", default='guide', help="train-test split stratege. guide/gene/guide_dropdistance/gene_dropdistance. guide_dropdistance: To test the models without distance associated features. default: guide")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
 
@@ -116,24 +118,8 @@ def DataFrame_input(df):
             for j in gene_df.index:
                 df.at[j,'median']=median
                 df.at[j,'activity_score']=median-df['log2FC'][j]
+                df.at[j,'Nr_guide']=gene_df.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
-    for i in list(set(list(df['geneid']))):
-        df_gene=df[df['geneid']==i]
-        for j in df_gene.index:
-            df.at[j,'Nr_guide']=df_gene.shape[0]
-    df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
-    sequences=list(dict.fromkeys(df['sequence']))
-    log2FC=np.array(df['log2FC'],dtype=float)
-    ### one hot encoded sequence features
-    PAM_encoded=[]
-    sequence_encoded=[]
-    dinucleotide_encoded=[]
-    for i in df.index:
-        PAM_encoded.append(self_encode(df['PAM'][i]))
-        sequence_encoded.append(self_encode(df['sequence'][i]))
-        dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
-        df.at[i,'geneid']=int(df['geneid'][i][1:])
-        df.at[i,'guideid']=sequences.index(df['sequence'][i])
     #check if the length of gRNA and PAM from all samples is the same
     if len(list(set(map(len,list(df['PAM'])))))==1:
         PAM_len=int(list(set(map(len,list(df['PAM']))))[0])
@@ -147,6 +133,114 @@ def DataFrame_input(df):
         dinucleotide_len=int(list(set(map(len,list(df['sequence_30nt']))))[0])
     else:
         print("error: sequence len")
+        
+    #keep only genes with more than 5 guides from each dataset
+    df=df[df['Nr_guide']>=5]
+    logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
+    
+    import scipy
+    print(time.asctime(),'Preprocessing...')
+    r75=df[df['dataset']==0]
+    c18=df[df['dataset']==1]
+    r75.index=r75['sequence']
+    r75=r75.loc[c18['sequence']]
+    c18.index=c18['sequence']
+    scaled_log2FC_rc=dict()
+    for i in r75.index:
+        scaled_log2FC_rc[i]=np.mean([r75['log2FC'][i],c18['log2FC'][i]])
+    for i in df.index:
+        if df['dataset'][i] in [0,1]:
+            df.at[i,'scaled_log2FC']=scaled_log2FC_rc[df['sequence'][i]]
+    logging_file.write("Number of guides in E75 Rousset/E18 Cui: %s \n" % r75.shape[0])        
+    w=df[df['dataset']==2]
+    r75=df[df['dataset']==0]
+    w_overlap_log2fc=list()
+    r_overlap_log2fc=list()
+    w_overlap_seq=list()
+    for gene in list(set(w['geneid'])):
+        if gene in list(r75['geneid']):
+            w_gene=w[w['geneid']==gene]
+            r_gene=r75[r75['geneid']==gene]
+            overlap_pos=[pos for pos in list(w_gene['distance_start_codon']) if pos in list(r_gene['distance_start_codon'])]
+            if len(overlap_pos)==0:
+                continue
+            for pos in overlap_pos:
+                w_pos=w_gene[w_gene['distance_start_codon']==pos]
+                r_pos=r_gene[r_gene['distance_start_codon']==pos]
+                w_overlap_log2fc.append(sum(w_pos['log2FC']))
+                r_overlap_log2fc.append(sum(r_pos['scaled_log2FC']))
+                w_overlap_seq.append(list(w_pos['sequence'])[0])
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(w_overlap_log2fc,r_overlap_log2fc) 
+    logging_file.write("Number of guides in Wang: %s \n" % w.shape[0]) 
+    logging_file.write("Number of overlapping guides between Wang and Rousset/Cui: %s \n" % len(w_overlap_log2fc))  
+    logging_file.write("Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: %s , %s \n" % (slope,intercept))      
+    
+    plt.scatter(w_overlap_log2fc,r_overlap_log2fc,color='skyblue',edgecolors='white')
+    plt.plot(w_overlap_log2fc,np.array(w_overlap_log2fc)*slope+intercept,color='red')
+    plt.xlabel("logFC in Wang")
+    plt.ylabel("average logFC of E75 Rousset and E18 Cui")
+    plt.title("N = "+str(len(w_overlap_log2fc)))
+    plt.savefig(output_file_name+'/regress_wang.svg',dpi=150)
+    plt.close()
+        
+    for i in df.index:
+        if df['dataset'][i] in [0,1]:
+            if df['dataset'][i]==0:
+                df.at[i,'training']=1
+            else:
+                df.at[i,'training']=0
+        else:
+            df.at[i,'scaled_log2FC']=df['log2FC'][i]*slope+intercept
+            if df['sequence'][i] not in w_overlap_seq:
+                df.at[i,'training']=1
+            else:
+                df.at[i,'training']=0
+    
+    for i in range(3):
+        sns.distplot(df[df['dataset']==i]['activity_score'],label=dataset_labels[i],hist=False)
+    plt.legend()
+    plt.xlabel("Activity scores (before scaling)")
+    plt.savefig(output_file_name+"/activity_score_before.svg", dpi=150)
+    plt.close()
+    for dataset in range(len(datasets)):
+        dataset_df=df[df['dataset']==dataset]
+        for i in list(set(dataset_df['geneid'])):
+            gene_df=dataset_df[dataset_df['geneid']==i]
+            median=statistics.median(gene_df['scaled_log2FC'])
+            for j in gene_df.index:
+                df.at[j,'median']=median
+                df.at[j,'activity_score']=median-df['scaled_log2FC'][j]
+    
+    for i in range(3):
+        sns.distplot(df[df['dataset']==i]['scaled_log2FC'],label=dataset_labels[i],hist=False)
+    plt.legend()
+    plt.xlabel("Scaled logFC")
+    plt.savefig(output_file_name+"/scaled_log2fc.png", dpi=150)
+    plt.close()
+    
+    for i in range(3):
+        sns.distplot(df[df['dataset']==i]['activity_score'],label=dataset_labels[i],hist=False)
+    plt.legend()
+    plt.xlabel("Activity scores (after scaling)")
+    plt.savefig(output_file_name+"/activity_score_after.svg", dpi=150)
+    plt.close()
+    
+    training_tag=list(df['training'])
+    scaled_log2FC=np.array(df['scaled_log2FC'],dtype=float)
+    print(time.asctime(),'Done preprocessing...')
+    log2FC=np.array(df['log2FC'],dtype=float)
+    ### one hot encoded sequence features
+    PAM_encoded=[]
+    sequence_encoded=[]
+    dinucleotide_encoded=[]
+    guide_sequence_set=list(dict.fromkeys(df['sequence']))
+    for i in df.index:
+        df.at[i,'geneid']=int(df['geneid'][i][1:])
+        df.at[i,'guideid']=guide_sequence_set.index(df['sequence'][i])
+        PAM_encoded.append(self_encode(df['PAM'][i]))
+        sequence_encoded.append(self_encode(df['sequence'][i]))
+        dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
+    
     #define guideid based on chosen split method
     if split=='guide' or split=='guide_dropdistance':
         guideids=np.array(list(df['guideid']))
@@ -156,11 +250,9 @@ def DataFrame_input(df):
         print('Unexpected split method...')
         sys.exit()
     # remove columns that are not used in training
-    drop_features=['std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
+    drop_features=['training','scaled_log2FC','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
-    if split=='gene':
-        drop_features.append("geneid")
-    elif split=='guide_dropdistance':
+    if split=='guide_dropdistance':
         drop_features+=["distance_start_codon","distance_start_codon_perc"]#,'guide_GC_content', 'homopolymers', 'MFE_hybrid_full', 'MFE_hybrid_seed', 'MFE_homodimer_guide', 'MFE_monomer_guide']
     for feature in drop_features:
         try:
@@ -182,7 +274,6 @@ def DataFrame_input(df):
     sequence_encoded=np.array(sequence_encoded)
     dinucleotide_encoded=np.array(dinucleotide_encoded)
     X=np.c_[X,sequence_encoded,PAM_encoded,dinucleotide_encoded]
-    
     ###add one-hot encoded sequence features to headers
     nts=['A','T','C','G']
     for i in range(sequence_len):
@@ -201,7 +292,7 @@ def DataFrame_input(df):
     logging_file.write('Number of features: %s\n'%len(headers))
     logging_file.write('Features: %s\n'%",".join(headers))
     
-    return X, y, headers,dataset_col,log2FC,median , guideids,sequences
+    return X, y, headers,dataset_col,log2FC,median , guideids,guide_sequence_set,scaled_log2FC,training_tag
 
 
 def Evaluation(output_file_name,y,predictions,name):
@@ -229,8 +320,8 @@ def Evaluation(output_file_name,y,predictions,name):
     plt.close()
     
 def SHAP(estimator,X,headers):
-    X_train=pandas.DataFrame(X,columns=headers)
-    X_train=X_train.astype(float)
+    X=pandas.DataFrame(X,columns=headers)
+    X=X.astype(float)
     shap_values = shap.TreeExplainer(estimator).shap_values(X,check_additivity=False)
     values=pandas.DataFrame({'shap_values':np.mean(np.absolute(shap_values),axis=0),'features':headers})
     values.to_csv(output_file_name+"/shap_value_mean.csv",index=False,sep='\t')
@@ -318,8 +409,16 @@ def main():
     training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
     #dropping unnecessary features and encode sequence features
-    X,y,headers,dataset_col,log2FC,median,guideids, guide_sequence_set = DataFrame_input(training_df)
+    X,y,headers,dataset_col,log2FC,median,guideids, guide_sequence_set ,scaled_log2FC ,training_tag= DataFrame_input(training_df)
     open(output_file_name + '/log.txt','a').write("Data input Time: %s seconds\n\n" %('{:.2f}'.format(time.time()-start_time)))  
+    X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,scaled_log2FC,median,guideids,dataset_col,training_tag],
+                              columns=headers+['activity','log2FC','scaled_log2FC','median','guideid','dataset_col','training_tag'])
+    dtypes=dict()
+    for feature in X_df.columns.values:
+        if feature != 'geneid':
+            dtypes.update({feature:float})
+    X_df=X_df.astype(dtypes)
+    guideid_set=list(set(guideids)) #use the previous split sets for comparison
     
     if choice=='rf':
         from sklearn.ensemble import RandomForestRegressor
@@ -330,6 +429,11 @@ def main():
                         min_weight_fraction_leaf=0.0, n_estimators=512, n_jobs=1,
                         verbose=0, warm_start=False,random_state = np.random.seed(111))
     if choice=='lasso':
+        X_hyperopt=X_df[X_df['dataset_col'].isin(training_sets)]
+        X_hyperopt=X_hyperopt[X_hyperopt['training_tag']==1]
+        y_hyperopt=X_hyperopt['activity']
+        guideids_hyperopt=X_hyperopt['guideid']
+        X_hyperopt=X_hyperopt[headers]
         from sklearn import linear_model
         from sklearn.model_selection import  cross_val_score,GroupKFold
         from hyperopt import hp, tpe, Trials
@@ -341,7 +445,7 @@ def main():
             params = convert_int_params(int_types, params)
             # Extract the boosting type
             estimator = linear_model.Lasso(random_state = np.random.seed(111),**params)
-            score = cross_val_score(estimator, X, y, groups=guideids,scoring=scorer, cv=GroupKFold(n_splits=5)).mean()
+            score = cross_val_score(estimator, X_hyperopt, y_hyperopt, groups=guideids_hyperopt,scoring=scorer, cv=GroupKFold(n_splits=5)).mean()
             #using logloss here for the loss but uncommenting line below calculates it from average accuracy
             result = {"loss": score, "params": params, 'status': hyperopt.STATUS_OK}
             return result
@@ -366,25 +470,17 @@ def main():
         # estimator=linear_model.Lasso(random_state = np.random.seed(111),alpha=0.010780717789770466, copy_X=True, fit_intercept=True,max_iter=1000, normalize=False, positive=False, precompute=False,selection='cyclic', tol=0.0001, warm_start=False)
         
         
-        
     open(output_file_name + '/log.txt','a').write("Estimator:"+str(estimator)+"\n")
-    
-    X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,median,guideids,dataset_col],
-                              columns=headers+['activity','log2FC','median','guideid','dataset_col'])
-    dtypes=dict()
-    for feature in X_df.columns.values:
-        if feature != 'geneid':
-            dtypes.update({feature:float})
-    X_df=X_df.astype(dtypes)
-    guideid_set=list(set(guideids))
     
     #preprocess for testing Pasteur model
     pasteur_test = training_df[(training_df['gene_essentiality']==1)&(training_df['coding_strand']==1)&(training_df['intergenic']==0)]
     pasteur_test=pasteur_test.dropna().reset_index(drop=True)
     for i in list(set(pasteur_test['geneid'])):
         p_gene=pasteur_test[pasteur_test['geneid']==i]
-        for j in p_gene.index:
-            pasteur_test.at[j,'Nr_guide']=p_gene.shape[0]
+        for d in list(set(p_gene['dataset'])):
+            p_dataset=p_gene[p_gene['dataset']==d]
+            for j in p_dataset.index:
+                pasteur_test.at[j,'Nr_guide']=p_dataset.shape[0]
     pasteur_test=pasteur_test[pasteur_test['Nr_guide']>=5]
     import statistics
     for dataset in range(len(datasets)):
@@ -402,88 +498,88 @@ def main():
     evaluations=defaultdict(list)
     iteration_predictions=defaultdict(list)
     kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
-    
+    print(time.asctime(),'Start 10-fold CV...')
     iteration=0
     for train_index, test_index in kf.split(guideid_set):##split the combined training set into train and test based on guideid
         train_index = np.array(guideid_set)[train_index]
         test_index = np.array(guideid_set)[test_index]
-        X_train = X_df[X_df['guideid'].isin(train_index)]
-        X_train=X_train[X_train['dataset_col'].isin(training_sets)]
+        train = X_df[X_df['guideid'].isin(train_index)]
+        train=train[train['training_tag']==1]
+        X_train=train[train['dataset_col'].isin(training_sets)]
         y_train=np.array(X_train['activity'])
         X_train=np.array(X_train[headers])
         test = X_df[X_df['guideid'].isin(test_index)]
         y_test=np.array(test['activity'])
         log2FC_test = np.array( test['log2FC'])
+        scaled_log2FC_test=np.array(test['scaled_log2FC'])
         median_test =np.array( test['median'])
         X_test=np.array(test[headers])
+        
         estimator = estimator.fit(X_train,y_train)
         predictions = estimator.predict(X_test)
+        
         iteration+=1
         iteration_predictions['log2FC'].append(list(log2FC_test))
+        iteration_predictions['scaled_log2FC'].append(list(scaled_log2FC_test))
         iteration_predictions['pred'].append(list(predictions))
         iteration_predictions['iteration'].append([iteration]*len(y_test))
         iteration_predictions['dataset'].append(list(test['dataset_col']))
         iteration_predictions['geneid'].append(list(test['guideid']))
         
         evaluations['Rs_activity'].append(spearmanr(y_test, predictions)[0])
-        evaluations['Rs_depletion'].append(spearmanr(log2FC_test, median_test-predictions)[0])
-        evaluations['Rs_median'].append(spearmanr(log2FC_test, median_test)[0])
-        if len(datasets)>1:
-            X_combined = np.c_[X,y,log2FC,median,dataset_col]
-            # X_combined=pandas.DataFrame(data=X_combined,columns=headers+['activity_score','log2FC','median','dataset'])
+        evaluations['Rs_depletion'].append(spearmanr(scaled_log2FC_test, median_test-predictions)[0])
+        evaluations['Rs_median'].append(spearmanr(scaled_log2FC_test, median_test)[0])
+        for dataset in range(len(datasets)):
+            dataset1=test[test['dataset_col']==dataset]
+            X_test_1=dataset1[headers]
+            y_test_1=np.array(dataset1['activity'],dtype=float)
+            log2FC_test_1=np.array(dataset1['log2FC'],dtype=float)
+            scaled_log2FC_test_1=np.array(dataset1['scaled_log2FC'])
+            median_test_1=np.array(dataset1['median'],dtype=float)
             
-            X_combined=pandas.DataFrame(data=np.c_[X_combined,guideids],columns=headers+['activity_score','log2FC','median','dataset','guideid'])
-            X_combined=X_combined[X_combined['guideid'].isin(test_index)]
-            for dataset in range(len(datasets)):
-                dataset1=X_combined[X_combined['dataset']==dataset]
-                X_test_1=dataset1[headers]
-                y_test_1=np.array(dataset1['activity_score'],dtype=float)
-                log2FC_test_1=np.array(dataset1['log2FC'],dtype=float)
-                median_test_1=np.array(dataset1['median'],dtype=float)
-                X_test_1=np.array(X_test_1)
-                predictions=estimator.predict(X_test_1)
-                spearman_rho,_=spearmanr(y_test_1, predictions)
-                evaluations['Rs_activity_test%s'%(dataset+1)].append(spearman_rho)
-                evaluations['Rs_depletion_test%s'%(dataset+1)].append(spearmanr(log2FC_test_1, median_test_1-predictions)[0])
-                evaluations['Rs_median_test%s'%(dataset+1)].append(spearmanr(log2FC_test_1, median_test_1)[0])
-            
-            #Pasteur method test on our test set
-            pasteur=pasteur_test[(pasteur_test['guideid'].isin(test_index))]
-            test_data=pasteur
+            predictions=estimator.predict(X_test_1)
+            spearman_rho,_=spearmanr(y_test_1, predictions)
+            evaluations['Rs_activity_test%s'%(dataset+1)].append(spearman_rho)
+            evaluations['Rs_depletion_test%s'%(dataset+1)].append(spearmanr(scaled_log2FC_test_1, median_test_1-predictions)[0])
+            evaluations['Rs_median_test%s'%(dataset+1)].append(spearmanr(scaled_log2FC_test_1, median_test_1)[0])
+        
+        #Pasteur method test on our test set
+        pasteur=pasteur_test[(pasteur_test['guideid'].isin(test_index))]
+        test_data=pasteur
+        training_seq,guides_index=find_target(test_data)
+        training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
+        training_seq=training_seq.reshape(training_seq.shape[0],-1)
+        test_data=test_data.loc[guides_index]
+        reg=pickle.load(open('Pasteur_model.pkl','rb'))
+        test_data['pasteur_score']=reg.predict(training_seq).reshape(-1, 1).ravel()
+        iteration_predictions['pasteur_score'].append(list(reg.predict(training_seq).reshape(-1, 1).ravel()))
+        for i in test_data.index:
+            test_data.at[i,'predicted_score']=test_data['median'][i]-test_data['pasteur_score'][i]
+        evaluations['Rs_depletion_pasteur_data'].append(spearmanr(test_data['log2FC'], test_data['predicted_score'])[0])
+        evaluations['Rs_activity_pasteur_data'].append(spearmanr(test_data['activity_score'], test_data['pasteur_score'])[0])
+        for dataset in range(len(datasets)):
+            test_data=pasteur[pasteur['dataset']==dataset]
             training_seq,guides_index=find_target(test_data)
             training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
             training_seq=training_seq.reshape(training_seq.shape[0],-1)
             test_data=test_data.loc[guides_index]
-            reg=pickle.load(open('Pasteur_model.pkl','rb'))
             test_data['pasteur_score']=reg.predict(training_seq).reshape(-1, 1).ravel()
-            iteration_predictions['pasteur_score'].append(list(reg.predict(training_seq).reshape(-1, 1).ravel()))
+            
             for i in test_data.index:
                 test_data.at[i,'predicted_score']=test_data['median'][i]-test_data['pasteur_score'][i]
-            evaluations['Rs_depletion_pasteur_data'].append(spearmanr(test_data['log2FC'], test_data['predicted_score'])[0])
-            evaluations['Rs_activity_pasteur_data'].append(spearmanr(test_data['activity_score'], test_data['pasteur_score'])[0])
-            for dataset in range(len(datasets)):
-                test_data=pasteur[pasteur['dataset']==dataset]
-                training_seq,guides_index=find_target(test_data)
-                training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
-                training_seq=training_seq.reshape(training_seq.shape[0],-1)
-                test_data=test_data.loc[guides_index]
-                test_data['pasteur_score']=reg.predict(training_seq).reshape(-1, 1).ravel()
-                
-                for i in test_data.index:
-                    test_data.at[i,'predicted_score']=test_data['median'][i]-test_data['pasteur_score'][i]
-                evaluations['Rs_depletion_pasteur_data%s'%(dataset+1)].append(spearmanr(test_data['log2FC'], test_data['predicted_score'])[0])
-                # Evaluation(output_file_name,np.array(test_data['log2FC']),np.array(test_data['predicted_score']),"X_pasteur_test%s"%(dataset+1))
-                evaluations['Rs_activity_pasteur_data%s'%(dataset+1)].append(spearmanr(test_data['activity_score'], test_data['pasteur_score'])[0])
+            evaluations['Rs_depletion_pasteur_data%s'%(dataset+1)].append(spearmanr(test_data['log2FC'], test_data['predicted_score'])[0])
+            # Evaluation(output_file_name,np.array(test_data['log2FC']),np.array(test_data['predicted_score']),"X_pasteur_test%s"%(dataset+1))
+            evaluations['Rs_activity_pasteur_data%s'%(dataset+1)].append(spearmanr(test_data['activity_score'], test_data['pasteur_score'])[0])
 
     evaluations=pandas.DataFrame.from_dict(evaluations)
     evaluations.to_csv(output_file_name+'/iteration_scores.csv',sep='\t',index=True)
     iteration_predictions=pandas.DataFrame.from_dict(iteration_predictions)
     iteration_predictions.to_csv(output_file_name+'/iteration_predictions.csv',sep='\t',index=False)
-    
+    print(time.asctime(),'Start saving model...')
     logging_file= open(output_file_name + '/log.txt','a')
-    
     #save models trained with all samples
-    estimator.fit(np.array(X_df[X_df['dataset_col'].isin(training_sets)][headers]),np.array(X_df[X_df['dataset_col'].isin(training_sets)]['activity']))
+    X_all=X_df[X_df['dataset_col'].isin(training_sets)][headers]
+    estimator.fit(np.array(X_all),np.array(X_df[X_df['dataset_col'].isin(training_sets)]['activity']))
     os.mkdir(output_file_name+'/saved_model')
     filename = output_file_name+'/saved_model/CRISPRi_model.sav'
     pickle.dump(estimator, open(filename, 'wb')) 
@@ -500,16 +596,13 @@ def main():
     
     X_test = X_df[X_df['guideid'].isin(guide_test)]
     y_test=np.array(X_test['activity'])
-    log2FC_test=np.array(X_test['log2FC'])
-    median_test=np.array(X_test['median'])
     X_test = np.array(X_test[headers])
+
     estimator.fit(X_train,y_train)
     predictions = estimator.predict(X_test)
     Evaluation(output_file_name,y_test,predictions,"X_test")
-    
+    print(time.asctime(),'Start model interpretation...')
     ### model validation with validation dataset
-    X_combined=pandas.DataFrame(data=np.c_[X,y,log2FC,median,dataset_col,guideids],columns=headers+['activity_score','log2FC','median','dataset','guideid'])
-    X_combined=X_combined[X_combined['guideid'].isin(guide_test)]
     if choice =='lasso':
         coef=pandas.DataFrame(data={'coef':estimator.coef_,'feature':headers})
         coef=coef.sort_values(by='coef',ascending=False)
@@ -535,7 +628,7 @@ def main():
             d['geneid']+=list(df['geneid'][i])
             d['dataset']+=list(df['dataset'][i])
             D=pandas.DataFrame.from_dict(d)
-            for k in training_sets:
+            for k in range(3):
                 D_dataset=D[D['dataset']==k]
                 for j in list(set(D_dataset['geneid'])):
                     D_gene=D_dataset[D_dataset['geneid']==j]
@@ -543,12 +636,12 @@ def main():
                     plot['sr'].append(sr)
                     plot['dataset'].append(k)
         plot=pandas.DataFrame.from_dict(plot)
-        for k in training_sets:
+        for k in range(3):
             p=plot[plot['dataset']==k]
             logging_file.write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
         logging_file.write("Mixed 3 datasets (median/mean): %s / %s \n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
     logging_file.close()
-    
+    print(time.asctime(),'Done.')
 
 
 if __name__ == '__main__':

@@ -68,7 +68,6 @@ class Crispr1DCNN(pl.LightningModule):
         # concat all layers
         #concat_layer = torch.cat((lin_features, lin_pam, lin_sequence_20nt, lin_sequence_30nt), 1)
         concat_layer = torch.cat((x_features, cnn_sequence_40nt), 1)
-        
         out = self.dropout(self.relu(self.bn1(self.ln1(concat_layer))))
         out = self.dropout(self.relu(self.bn2(self.ln2(out))))
         out = self.dropout(self.relu(self.bn3(self.ln3(out))))

@@ -29,12 +29,12 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
-
 from crispri_dl.dataloader import CrisprDatasetTrain
 from sklearn.preprocessing import StandardScaler
 from pytorch_lightning import seed_everything
-
 warnings.filterwarnings('ignore')
+sns.set_palette('Set2')
+dataset_labels=['E75 Rousset','E18 Cui','Wang']   
 class MyParser(argparse.ArgumentParser):
     def error(self, message):
         sys.stderr.write('error: %s\n' % message)
@@ -124,22 +124,7 @@ def DataFrame_input(df):
     logging_file= open(output_file_name + '/log.txt','a')
     df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==1)]
     df=df.dropna()
-    for i in list(set(list(df['geneid']))):
-        df_gene=df[df['geneid']==i]
-        for j in df_gene.index:
-            df.at[j,'Nr_guide']=df_gene.shape[0]
-    logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])       
-    df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
-    log2FC=np.array(df['log2FC'],dtype=float)
-    sequences=list(dict.fromkeys(df['sequence']))
-    for i in df.index:
-        df.at[i,'geneid']=int(df['geneid'][i][1:])
-        df.at[i,'guideid']=sequences.index(df['sequence'][i])
-    #define guideid based on chosen split method
-    if split=='guide':
-        guideids=np.array(list(df['guideid']))
-    elif split=='gene':
-        guideids=np.array(list(df['geneid']))
+    logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])    
     import statistics
     for dataset in range(len(datasets)):
         dataset_df=df[df['dataset']==dataset]
@@ -149,12 +134,117 @@ def DataFrame_input(df):
             for j in gene_df.index:
                 df.at[j,'median']=median
                 df.at[j,'activity_score']=median-df['log2FC'][j]
+                df.at[j,'Nr_guide']=gene_df.shape[0]
+    guide_sequence_set=list(dict.fromkeys(df['sequence']))
+    for i in df.index:
+        df.at[i,'geneid']=int(df['geneid'][i][1:])
+        df.at[i,'guideid']=guide_sequence_set.index(df['sequence'][i])
+    
+    df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from each datasets
+    logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
+    
+    import scipy
+    print(time.asctime(),'Preprocessing...')
+    r75=df[df['dataset']==0]
+    c18=df[df['dataset']==1]
+    r75.index=r75['sequence']
+    r75=r75.loc[c18['sequence']]
+    c18.index=c18['sequence']
+    scaled_log2FC_rc=dict()
+    for i in r75.index:
+        scaled_log2FC_rc[i]=np.mean([r75['log2FC'][i],c18['log2FC'][i]])
+    for i in df.index:
+        if df['dataset'][i] in [0,1]:
+            df.at[i,'scaled_log2FC']=scaled_log2FC_rc[df['sequence'][i]]
+    logging_file.write("Number of guides in E75 Rousset/E18 Cui: %s \n" % r75.shape[0])        
+    w=df[df['dataset']==2]
+    r75=df[df['dataset']==0]
+    w_overlap_log2fc=list()
+    r_overlap_log2fc=list()
+    w_overlap_seq=list()
+    for gene in list(set(w['geneid'])):
+        if gene in list(r75['geneid']):
+            w_gene=w[w['geneid']==gene]
+            r_gene=r75[r75['geneid']==gene]
+            overlap_pos=[pos for pos in list(w_gene['distance_start_codon']) if pos in list(r_gene['distance_start_codon'])]
+            if len(overlap_pos)==0:
+                continue
+            for pos in overlap_pos:
+                w_pos=w_gene[w_gene['distance_start_codon']==pos]
+                r_pos=r_gene[r_gene['distance_start_codon']==pos]
+                w_overlap_log2fc.append(sum(w_pos['log2FC']))
+                r_overlap_log2fc.append(sum(r_pos['scaled_log2FC']))
+                w_overlap_seq.append(list(w_pos['sequence'])[0])
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(w_overlap_log2fc,r_overlap_log2fc) 
+    logging_file.write("Number of guides in Wang: %s \n" % w.shape[0]) 
+    logging_file.write("Number of overlapping guides between Wang and Rousset/Cui: %s \n" % len(w_overlap_log2fc))  
+    logging_file.write("Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: %s , %s \n" % (slope,intercept))      
+    
+    plt.scatter(w_overlap_log2fc,r_overlap_log2fc,color='skyblue',edgecolors='white')
+    plt.plot(w_overlap_log2fc,np.array(w_overlap_log2fc)*slope+intercept,color='red')
+    plt.xlabel("logFC in Wang")
+    plt.ylabel("average logFC of E75 Rousset and E18 Cui")
+    plt.title("N = "+str(len(w_overlap_log2fc)))
+    plt.savefig(output_file_name+'/regress_wang.svg',dpi=150)
+    plt.close()
+        
+    for i in df.index:
+        if df['dataset'][i] in [0,1]:
+            if df['dataset'][i]==0:
+                df.at[i,'training']=1
+            else:
+                df.at[i,'training']=0
+        else:
+            df.at[i,'scaled_log2FC']=df['log2FC'][i]*slope+intercept
+            if df['sequence'][i] not in w_overlap_seq:
+                df.at[i,'training']=1
+            else:
+                df.at[i,'training']=0
+    
+    for i in range(3):
+        sns.distplot(df[df['dataset']==i]['activity_score'],label=dataset_labels[i],hist=False)
+    plt.legend()
+    plt.xlabel("Activity scores (before scaling)")
+    plt.savefig(output_file_name+"/activity_score_before.svg", dpi=150)
+    plt.close()
+    for dataset in range(len(datasets)):
+        dataset_df=df[df['dataset']==dataset]
+        for i in list(set(dataset_df['geneid'])):
+            gene_df=dataset_df[dataset_df['geneid']==i]
+            median=statistics.median(gene_df['scaled_log2FC'])
+            for j in gene_df.index:
+                df.at[j,'median']=median
+                df.at[j,'activity_score']=median-df['scaled_log2FC'][j]
+    
+    for i in range(3):
+        sns.distplot(df[df['dataset']==i]['scaled_log2FC'],label=dataset_labels[i],hist=False)
+    plt.legend()
+    plt.xlabel("Scaled logFC")
+    plt.savefig(output_file_name+"/scaled_log2fc.png", dpi=150)
+    plt.close()
+    
+    for i in range(3):
+        sns.distplot(df[df['dataset']==i]['activity_score'],label=dataset_labels[i],hist=False)
+    plt.legend()
+    plt.xlabel("Activity scores (after scaling)")
+    plt.savefig(output_file_name+"/activity_score_after.svg", dpi=150)
+    plt.close()
+    
+    training_tag=list(df['training'])
+    scaled_log2FC=np.array(df['scaled_log2FC'],dtype=float)
+    print(time.asctime(),'Done preprocessing...')
+    
+    log2FC=np.array(df['log2FC'],dtype=float)
+    #define guideid based on chosen split method
+    if split=='guide':
+        guideids=np.array(list(df['guideid']))
+    elif split=='gene':
+        guideids=np.array(list(df['geneid']))
+    
     # remove columns that are not used in training
-    drop_features=['std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
-                   "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','gene_essentiality',
+    drop_features=['scaled_log2FC','training','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
+                   "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','gene_essentiality',"geneid",
                    'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
-    if split=='gene':
-        drop_features.append("geneid")
     for feature in drop_features:
         try:
             df=df.drop(feature,1)
@@ -175,7 +265,7 @@ def DataFrame_input(df):
     logging_file.write("Number of features: %s\n" % len(headers))
     logging_file.write('Features: %s\n'%",".join(headers))
     X=pandas.DataFrame(data=X,columns=headers)
-    return X, y, headers,dataset_col,log2FC,median, guideids,sequences
+    return X, y, headers,dataset_col,log2FC,median, guideids,scaled_log2FC ,training_tag
 
 
 def Evaluation(output_file_name,y,predictions,kmeans,kmeans_train,name):
@@ -242,7 +332,7 @@ def main():
     training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
     #dropping unnecessary features and encode sequence features
-    X,y,headers,dataset_col,log2FC,median,guideids, guide_sequence_set = DataFrame_input(training_df)
+    X,y,headers,dataset_col,log2FC,median,guideids ,scaled_log2FC ,training_tag= DataFrame_input(training_df)
     open(output_file_name + '/log.txt','a').write("Data input Time: %s seconds\n\n" %('{:.2f}'.format(time.time()-start_time)))  
     
     header=[i for i in headers if i !='sequence_30nt']
@@ -251,13 +341,13 @@ def main():
     max_epochs = 500
     batch_size = 32
     patience = 5
-    
+    print(time.asctime(),'Start 10-fold CV...')
     #k-fold cross validation
     evaluations=defaultdict(list)
     iteration_predictions=defaultdict(list)
     kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
-    X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,median,guideids,dataset_col],
-                              columns=headers+['activity','log2FC','median','guideid','dataset_col'])
+    X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,scaled_log2FC,median,guideids,dataset_col,training_tag],
+                              columns=headers+['activity','log2FC','scaled_log2FC','median','guideid','dataset_col','training_tag'])
     fold_inner=0
     guideid_set=list(set(guideids))
     for train_index, test_index in kf.split(guideid_set):
@@ -266,32 +356,31 @@ def main():
         test = X_df[X_df['guideid'].isin(test_index)]
         y_test=test['activity']
         log2FC_test = np.array( test['log2FC'])
+        scaled_log2FC_test=np.array(test['scaled_log2FC'])
         median_test =np.array( test['median'])
         X_test=test[headers]
-        
         # train val split
         index_train, index_val = sklearn.model_selection.train_test_split(train_index, test_size=test_size,random_state=np.random.seed(111))
         X_train = X_df[X_df['guideid'].isin(index_train)]
+        X_train=X_train[X_train['training_tag']==1] #remove duplicate guides
         X_train=X_train[X_train['dataset_col'].isin(training_sets)]
         X_val = X_df[X_df['guideid'].isin(index_val)]
+        X_val=X_val[X_val['training_tag']==1]
         X_val=X_val[X_val['dataset_col'].isin(training_sets)]
         y_train=X_train['activity']
         X_train=X_train[headers]
         y_val=X_val['activity']
         X_val=X_val[headers]
         
+        #scaling
         SCALE = StandardScaler()
-        
         X_train[header] = SCALE.fit_transform(X_train[header])
-        filename = output_file_name+'/SCALEr.sav'
-        pickle.dump(SCALE, open(filename, 'wb'))
         X_val[header] = SCALE.transform(X_val[header])
         X_test[header] = SCALE.transform(X_test[header])
         
-        
         #loader
         loader_train = CrisprDatasetTrain(X_train, y_train, header)
-        loader_train = DataLoader(loader_train, batch_size=batch_size, shuffle = True)
+        loader_train = DataLoader(loader_train, batch_size=batch_size, shuffle = True,drop_last=True)
         dataset_val  = CrisprDatasetTrain(X_val, y_val, header)
         loader_val = DataLoader(dataset_val, batch_size=batch_size)
         loader_test = CrisprDatasetTrain(X_test, y_test, header)
@@ -338,22 +427,21 @@ def main():
         predictions = predictions_test[0].cpu().numpy().flatten()
         fold_inner+=1
         iteration_predictions['log2FC'].append(list(log2FC_test))
+        iteration_predictions['scaled_log2FC'].append(list(scaled_log2FC_test))
         iteration_predictions['pred'].append(list(predictions))
         iteration_predictions['iteration'].append([fold_inner]*len(y_test))
         iteration_predictions['dataset'].append(list(test['dataset_col']))
         iteration_predictions['geneid'].append(list(test['guideid']))
+
         evaluations['Rs_activity'].append(spearmanr(y_test, predictions)[0])
-        evaluations['Rs_depletion'].append(spearmanr(log2FC_test, median_test-predictions)[0])
-        
+        evaluations['Rs_depletion'].append(spearmanr(scaled_log2FC_test, median_test-predictions)[0])
         if len(datasets)>1:
-            X_combined = np.c_[X,y,log2FC,median,dataset_col]
-            X_combined=pandas.DataFrame(data=np.c_[X_combined,guideids],columns=headers+['activity_score','log2FC','median','dataset','guideid'])
-            X_combined=X_combined[X_combined['guideid'].isin(test_index)]
             for dataset in range(len(datasets)):
-                dataset1=X_combined[X_combined['dataset']==dataset]
+                dataset1=test[test['dataset_col']==dataset]
                 X_test_1=dataset1[headers]
-                y_test_1=dataset1['activity_score']
+                y_test_1=dataset1['activity']
                 log2FC_test_1=np.array(dataset1['log2FC'],dtype=float)
+                scaled_log2FC_test_1=np.array(dataset1['scaled_log2FC'])
                 median_test_1=np.array(dataset1['median'],dtype=float)
                 
                 loader_test = CrisprDatasetTrain(X_test_1, y_test_1, header)
@@ -367,14 +455,14 @@ def main():
                 predictions = predictions_test[0].cpu().numpy().flatten()
                 spearman_rho,_=spearmanr(y_test_1, predictions)
                 evaluations['Rs_activity_test%s'%(dataset+1)].append(spearman_rho)
-                evaluations['Rs_depletion_test%s'%(dataset+1)].append(spearmanr(log2FC_test_1, median_test_1-predictions)[0])
+                evaluations['Rs_depletion_test%s'%(dataset+1)].append(spearmanr(scaled_log2FC_test_1, median_test_1-predictions)[0])
             
 
     evaluations=pandas.DataFrame.from_dict(evaluations)
     evaluations.to_csv(output_file_name+'/iteration_scores.csv',sep='\t',index=True)
     iteration_predictions=pandas.DataFrame.from_dict(iteration_predictions)
     iteration_predictions.to_csv(output_file_name+'/iteration_predictions.csv',sep='\t',index=False)
-    
+    print(time.asctime(),'Start saving model...')
     index_train, index_val = sklearn.model_selection.train_test_split(guideid_set, test_size=0.2,random_state=np.random.seed(111))
     X_train = X_df[X_df['guideid'].isin(index_train)]
     X_train=X_train[X_train['dataset_col'].isin(training_sets)]
@@ -384,6 +472,12 @@ def main():
     X_train=X_train[headers]
     y_val=X_val['activity']
     X_val=X_val[headers]
+    
+    SCALE = StandardScaler()
+    X_train[header] = SCALE.fit_transform(X_train[header])
+    filename = output_file_name+'/SCALEr.sav'
+    pickle.dump(SCALE, open(filename, 'wb'))
+    X_val[header] = SCALE.transform(X_val[header])
     #loader
     loader_train = CrisprDatasetTrain(X_train, y_train, header)
     loader_train = DataLoader(loader_train, batch_size=batch_size, shuffle = True, drop_last=True)
@@ -435,7 +529,7 @@ def main():
             p=plot[plot['dataset']==k]
             logging_file.write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
         logging_file.write("Mixed 3 datasets (median/mean): %s / %s \n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
-
+    print(time.asctime(),'Done.')
 if __name__ == '__main__':
     main()
     open(output_file_name + '/log.txt','a').write("Execution Time: %s seconds\n" %('{:.2f}'.format(time.time()-start_time)))    
