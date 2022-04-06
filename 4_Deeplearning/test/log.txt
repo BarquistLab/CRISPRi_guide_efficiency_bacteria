@@ -6,23 +6,28 @@ Total number of guides in dataset ../0_Datasets/E18_Cui.csv: 59246
 Total number of guides in dataset ../0_Datasets/Wang_dataset.csv: 52104
 Training dataset: all 3 datasets
 Number of guides for essential genes: 8099 
+Number of guides after filtering: 7400 
+Number of guides in E75 Rousset/E18 Cui: 1618 
+Number of guides in Wang: 4164 
+Number of overlapping guides between Wang and Rousset/Cui: 378 
+Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.7327817156533764 , -1.199772302997543 
 Number of features: 9
 Features: sequence_30nt,guide_GC_content,distance_start_codon,distance_start_codon_perc,homopolymers,MFE_hybrid_full,MFE_hybrid_seed,MFE_homodimer_guide,MFE_monomer_guide
-Data input Time: 5.45 seconds
+Data input Time: 28.32 seconds
 
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e37af28b0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e3452aa00>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e377efc70>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e31066460>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e310529a0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e377e2310>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e37747df0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e3786a880>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e30c65a90>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f5e30a68550>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c6676ac0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c64259d0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c641aa60>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c6571700>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c6566040>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c66397f0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c6853310>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c64694c0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c686e940>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3ab18a760>
 Median Spearman correlation for all gRNAs of each gene: 
-E75 Rousset (median/mean): 0.3571428571428572 / 0.3024548984101166 
-E18 Cui (median/mean): 0.32107843137254904 / 0.31036363070824985 
-Wang (median/mean): 0.2928571428571428 / 0.27404877445741305 
-Mixed 3 datasets (median/mean): 0.31085318350050717 / 0.27404877445741305 
-Execution Time: 889.41 seconds
+E75 Rousset (median/mean): 0.3214285714285715 / 0.2985230427622146 
+E18 Cui (median/mean): 0.3636363636363637 / 0.3097854223631701 
+Wang (median/mean): 0.31843156843156845 / 0.28388454409923364 
+Mixed 3 datasets (median/mean): 0.3303571428571428 / 0.28388454409923364 
+Execution Time: 7536.89 seconds

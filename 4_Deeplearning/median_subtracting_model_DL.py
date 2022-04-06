@@ -439,6 +439,7 @@ def main():
             for dataset in range(len(datasets)):
                 dataset1=test[test['dataset_col']==dataset]
                 X_test_1=dataset1[headers]
+                X_test_1[header] = SCALE.transform(X_test_1[header])
                 y_test_1=dataset1['activity']
                 log2FC_test_1=np.array(dataset1['log2FC'],dtype=float)
                 scaled_log2FC_test_1=np.array(dataset1['scaled_log2FC'])

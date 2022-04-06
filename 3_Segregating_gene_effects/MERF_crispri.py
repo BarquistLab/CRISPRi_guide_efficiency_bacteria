@@ -254,6 +254,7 @@ estimator=RandomForestRegressor(bootstrap=True, criterion='friedman_mse', max_de
                         min_samples_leaf=18, min_samples_split=16,
                         min_weight_fraction_leaf=0.0, n_estimators=512, n_jobs=1,
                         verbose=0, warm_start=False,random_state = np.random.seed(111))
+
 open( output_file_name+ '/log.txt','a').write("Estimator:"+str(estimator)+"\n\n\n")
 guide_features=X_guide.columns.values.tolist()
 X_df=pandas.DataFrame(data=np.c_[X_gene,X_guide,y,clusters,guideids,medians,datasets],columns=gene_features+guide_features+['log2FC','clusters','guideid','median','dataset'])
@@ -266,7 +267,7 @@ for feature in X_df.columns.values:
 X_df=X_df.astype(dtypes)
 if os.path.isdir(output_file_name+'/saved_model')==False:  
     os.mkdir(output_file_name+'/saved_model')
-'''
+
 print(time.asctime(),'Start 10-fold CV...')    
 evaluations=defaultdict(list)
 iteration_predictions=defaultdict(list)
@@ -404,7 +405,121 @@ coef=pandas.DataFrame(mrf_lgbm.trained_b,index=mrf_lgbm.trained_b.index)
 coef.columns=gene_features
 coef.to_csv(output_file_name+"/saved_model/random_coef.csv",sep='\t',index=True)
 open(output_file_name + '/log.txt','a').write("Done saving model: %s s\n"%round(time.time()-start,3))
-'''
+
+print(time.asctime(),'Start model interpretation...')    
+##SHAP values for fixed-effect model
+import shap
+treexplainer = shap.TreeExplainer(mrf_lgbm.trained_fe_model)
+shap_values = treexplainer.shap_values(X_all,check_additivity=False)
+values=pandas.DataFrame({'shap_values':np.mean(np.absolute(shap_values),axis=0),'features':guide_features})
+values.to_csv(output_file_name+"/shap_value_mean.csv",index=False,sep='\t')
+open(output_file_name + '/log.txt','a').write("Done calculating SHAP values: %s s\n"%round(time.time()-start,3))
+shap.summary_plot(shap_values, X_all, plot_type="bar",show=False,color_bar=True,max_display=10)
+plt.subplots_adjust(left=0.35, top=0.95)
+plt.savefig(output_file_name+"/shap_value_bar.svg",dpi=400)
+plt.close()
+
+for i in [10,15,30]:
+    shap.summary_plot(shap_values, X_all,show=False,max_display=i,alpha=0.05)
+    plt.subplots_adjust(left=0.4, top=0.95,bottom=0.1)
+    plt.yticks(fontsize='medium')
+    plt.xticks(fontsize='medium')
+    plt.savefig(output_file_name+"/shap_value_top%s.svg"%(i),dpi=400)
+    plt.close()    
+
+print(time.asctime(),'Start calculating interaction values.') 
+#SHAP interaction values
+shap_values = treexplainer.shap_values(X_all.iloc[:1000,:],check_additivity=False)
+shap_interaction_values=treexplainer.shap_interaction_values(X_all.iloc[:1000,:])
+# pickle.dump(shap_interaction_values, open(path+"/shap_interaction_values_all.pkl", 'wb'))
+open(output_file_name + '/log.txt','a').write("Done calculating SHAP interaction values: %s s\n\n"%round(time.time()-start,3))
+#mean absolute values
+tmp = np.abs(shap_interaction_values).mean(0)
+tmp_1d=defaultdict(list)
+for i in range(len(guide_features)):
+    for j in range(i+1,len(guide_features)):
+        tmp_1d['feature1'].append(guide_features[i])
+        tmp_1d['feature2'].append(guide_features[j])
+        tmp_1d['mean_absolute_interaction_value'].append(tmp[i,j])
+tmp_1d=pandas.DataFrame.from_dict(tmp_1d)
+tmp_1d=tmp_1d.sort_values(by='mean_absolute_interaction_value',ascending=False).reset_index(drop=True)
+tmp_1d=tmp_1d.astype({'mean_absolute_interaction_value':float})
+numeric_features=['distance_start_codon','distance_start_codon_perc','homopolymers','guide_GC_content',
+                   'MFE_hybrid_full', 'MFE_hybrid_seed', 'MFE_homodimer_guide', 'MFE_monomer_guide']
+p=defaultdict(list)
+X_index=X_all.iloc[:1000,:].reset_index(drop=True) #use the same index as SHAP values
+coms=[[0,0],[1,0],[0,1],[1,1]] # 4 different types of feature combinations, 0 for -, 1 for +
+marker=['-','+']
+tmp_1d['global interaction rank']=tmp_1d.index+1
+for rank in tmp_1d.index[:5000]: #calculate the combination SHAP values for the top 5000 interaction pairs
+    pair=[tmp_1d['feature1'][rank],tmp_1d['feature2'][rank]]
+    for i in coms:
+        # for sequence features, 0 and 1 means absent or present of the nucleotide of corresponding positions
+        # for numeric features, 0 means values in the lower 0.5 quantile, and 1 means values in the upper 0.5 quantile.
+        if pair[0] not in numeric_features and  pair[1] not in numeric_features:
+            sample_df=X_index[(X_index[pair[0]]==i[0])&(X_index[pair[1]]==i[1])]     
+        elif pair[0] in numeric_features and pair[1] not in numeric_features:
+            if i[0]==1:
+                sample_df=X_index[(X_index[pair[0]]>=np.quantile(X_index[pair[0]],0.5))&(X_index[pair[1]]==i[1])]    
+            elif i[0]==0:
+                sample_df=X_index[(X_index[pair[0]]<np.quantile(X_index[pair[0]],0.5))&(X_index[pair[1]]==i[1])]    
+        elif pair[0] not in numeric_features and pair[1] in numeric_features:
+            if i[1]==1:
+                sample_df=X_index[(X_index[pair[1]]>=np.quantile(X_index[pair[1]],0.5))&(X_index[pair[0]]==i[0])]    
+            elif i[1]==0:
+                sample_df=X_index[(X_index[pair[1]]<np.quantile(X_index[pair[1]],0.5))&(X_index[pair[0]]==i[0])]    
+        elif pair[0] in numeric_features and pair[1] in numeric_features:
+            if i[0]==1 and i[1]==1:
+                sample_df=X_index[(X_index[pair[0]]>=np.quantile(X_index[pair[0]],0.5))&(X_index[pair[1]]>=np.quantile(X_index[pair[1]],0.5))]    
+            elif i[0]==0 and i[1]==1:
+                sample_df=X_index[(X_index[pair[0]]<np.quantile(X_index[pair[0]],0.5))&(X_index[pair[1]]>=np.quantile(X_index[pair[1]],0.5))]    
+            elif i[0]==1 and i[1]==0:
+                sample_df=X_index[(X_index[pair[0]]>=np.quantile(X_index[pair[0]],0.5))&(X_index[pair[1]]<np.quantile(X_index[pair[1]],0.5))]    
+            elif i[0]==0 and i[1]==0:
+                sample_df=X_index[(X_index[pair[0]]<np.quantile(X_index[pair[0]],0.5))&(X_index[pair[1]]<np.quantile(X_index[pair[1]],0.5))]    
+        if coms.index(i)==1:
+            f1=np.median(shap_values[sample_df.index,guide_features.index(pair[0])])
+            f2_m=np.median(shap_values[sample_df.index,guide_features.index(pair[1])])
+        if coms.index(i)==2:
+            f2=np.median(shap_values[sample_df.index,guide_features.index(pair[1])])
+            f1_m=np.median(shap_values[sample_df.index,guide_features.index(pair[0])])
+   
+        tmp_1d.at[rank,marker[i[0]]+" / "+marker[i[1]]]=np.median(shap_values[sample_df.index,guide_features.index(pair[0])]+shap_values[sample_df.index,guide_features.index(pair[1])])
+    tmp_1d.at[rank,'expected_+/+']=f1+f2
+    tmp_1d.at[rank,'expected_-/-']=f1_m+f2_m
+tmp_1d.to_csv(output_file_name+"/interaction_pair_sumSHAPvalues.csv",index=False,sep='\t')
+# plots for the reported pairs 
+marker=['-','+']
+pairs=[['sequence_20_C','GC2728'],['sequence_20_G','GC2728'],['sequence_20_A','GG2728'],['GG2728','TG2526']]
+labels={'GC2728':'+1 C','sequence_20_G':'20 G','sequence_20_C':'20 C','GG2728':'+1 G','sequence_20_A':'20 A','TG2526':'P1 T'}
+sns.set_style('whitegrid')
+coms=[[0,0],[1,0],[0,1],[1,1]]
+for pair in pairs:
+    p=defaultdict(list)
+    for i in coms:
+        sample_df=X_index[(X_index[pair[0]]==i[0])&(X_index[pair[1]]==i[1])] 
+        if coms.index(i)==1:
+            f1=np.median(shap_values[sample_df.index,guide_features.index(pair[0])])
+        if coms.index(i)==2:
+            f2=np.median(shap_values[sample_df.index,guide_features.index(pair[1])])
+        sample_df=X_index[(X_index[pair[0]]==i[0])&(X_index[pair[1]]==i[1])] 
+        p['pattern']+=[marker[i[0]]+" / "+marker[i[1]]]*sample_df.shape[0]
+        p['value']+=list(shap_values[sample_df.index,guide_features.index(pair[0])]+shap_values[sample_df.index,guide_features.index(pair[1])])
+    p=pandas.DataFrame.from_dict(p)
+    plot=p.dropna()
+    plot=p[p['pattern']!='- / -']
+    plt.figure(figsize=(5,4))
+    ax=sns.boxplot(data=plot,x='pattern',y='value',order=['+ / -','- / +','+ / +'],color='lightgrey')
+    ax.axhline(f1+f2,color='r',xmin=0.7,xmax=0.98)
+    plt.xticks(rotation=0,fontsize='large')
+    plt.xlabel("")
+    plt.title(labels[pair[0]]+' / '+labels[pair[1]],fontsize='large')
+    plt.ylabel("sum SHAP value",fontsize='large')
+    plt.subplots_adjust(left=0.2)
+    plt.savefig(output_file_name+"/shap_dependence_plot_%s_%s.svg"%(pair[0],pair[1]),dpi=400)
+    plt.close()    
+
+
 ###split again for evaluating the difference between train and test and plots
 guide_train, guide_test = sklearn.model_selection.train_test_split(guideid_set, test_size=test_size,random_state=np.random.seed(111))  
 guide_train, guide_val = sklearn.model_selection.train_test_split(guide_train, test_size=test_size,random_state=np.random.seed(111))  
@@ -588,118 +703,6 @@ if split=='guide' or split=='guide_dropdistance':
     # plt.show()
     plt.close()
     
-print(time.asctime(),'Start model interpretation...')    
-##SHAP values for fixed-effect model
-import shap
-treexplainer = shap.TreeExplainer(mrf_lgbm.trained_fe_model)
-shap_values = treexplainer.shap_values(X_train,check_additivity=False)
-values=pandas.DataFrame({'shap_values':np.mean(np.absolute(shap_values),axis=0),'features':guide_features})
-values.to_csv(output_file_name+"/shap_value_mean.csv",index=False,sep='\t')
-open(output_file_name + '/log.txt','a').write("Done calculating SHAP values: %s s\n"%round(time.time()-start,3))
-shap.summary_plot(shap_values, X_train, plot_type="bar",show=False,color_bar=True,max_display=10)
-plt.subplots_adjust(left=0.35, top=0.95)
-plt.savefig(output_file_name+"/shap_value_bar.svg",dpi=400)
-plt.close()
-
-for i in [10,15,30]:
-    shap.summary_plot(shap_values, X_train,show=False,max_display=i,alpha=0.05)
-    plt.subplots_adjust(left=0.4, top=0.95,bottom=0.1)
-    plt.yticks(fontsize='medium')
-    plt.xticks(fontsize='medium')
-    plt.savefig(output_file_name+"/shap_value_top%s.svg"%(i),dpi=400)
-    plt.close()    
-
-print(time.asctime(),'Start calculating interaction values.') 
-#SHAP interaction values
-shap_values = treexplainer.shap_values(X_train.iloc[:1000,:],check_additivity=False)
-shap_interaction_values=treexplainer.shap_interaction_values(X_train.iloc[:1000,:])
-# pickle.dump(shap_interaction_values, open(path+"/shap_interaction_values_all.pkl", 'wb'))
-open(output_file_name + '/log.txt','a').write("Done calculating SHAP interaction values: %s s\n\n"%round(time.time()-start,3))
-#mean absolute values
-tmp = np.abs(shap_interaction_values).mean(0)
-tmp_1d=defaultdict(list)
-for i in range(len(guide_features)):
-    for j in range(i+1,len(guide_features)):
-        tmp_1d['feature1'].append(guide_features[i])
-        tmp_1d['feature2'].append(guide_features[j])
-        tmp_1d['mean_absolute_interaction_value'].append(tmp[i,j])
-tmp_1d=pandas.DataFrame.from_dict(tmp_1d)
-tmp_1d=tmp_1d.sort_values(by='mean_absolute_interaction_value',ascending=False).reset_index(drop=True)
-tmp_1d=tmp_1d.astype({'mean_absolute_interaction_value':float})
-numeric_features=['distance_start_codon','distance_start_codon_perc','homopolymers','guide_GC_content',
-                   'MFE_hybrid_full', 'MFE_hybrid_seed', 'MFE_homodimer_guide', 'MFE_monomer_guide']
-p=defaultdict(list)
-X_index=X_train.iloc[:1000,:].reset_index(drop=True) #use the same index as SHAP values
-coms=[[0,0],[1,0],[0,1],[1,1]] # 4 different types of feature combinations, 0 for -, 1 for +
-marker=['-','+']
-tmp_1d['global interaction rank']=tmp_1d.index+1
-for rank in tmp_1d.index[:5000]: #calculate the combination SHAP values for the top 5000 interaction pairs
-    pair=[tmp_1d['feature1'][rank],tmp_1d['feature2'][rank]]
-    for i in coms:
-        # for sequence features, 0 and 1 means absent or present of the nucleotide of corresponding positions
-        # for numeric features, 0 means values in the lower 0.5 quantile, and 1 means values in the upper 0.5 quantile.
-        if pair[0] not in numeric_features and  pair[1] not in numeric_features:
-            sample_df=X_index[(X_index[pair[0]]==i[0])&(X_index[pair[1]]==i[1])]     
-        elif pair[0] in numeric_features and pair[1] not in numeric_features:
-            if i[0]==1:
-                sample_df=X_index[(X_index[pair[0]]>=np.quantile(X_index[pair[0]],0.5))&(X_index[pair[1]]==i[1])]    
-            elif i[0]==0:
-                sample_df=X_index[(X_index[pair[0]]<np.quantile(X_index[pair[0]],0.5))&(X_index[pair[1]]==i[1])]    
-        elif pair[0] not in numeric_features and pair[1] in numeric_features:
-            if i[1]==1:
-                sample_df=X_index[(X_index[pair[1]]>=np.quantile(X_index[pair[1]],0.5))&(X_index[pair[0]]==i[0])]    
-            elif i[1]==0:
-                sample_df=X_index[(X_index[pair[1]]<np.quantile(X_index[pair[1]],0.5))&(X_index[pair[0]]==i[0])]    
-        elif pair[0] in numeric_features and pair[1] in numeric_features:
-            if i[0]==1 and i[1]==1:
-                sample_df=X_index[(X_index[pair[0]]>=np.quantile(X_index[pair[0]],0.5))&(X_index[pair[1]]>=np.quantile(X_index[pair[1]],0.5))]    
-            elif i[0]==0 and i[1]==1:
-                sample_df=X_index[(X_index[pair[0]]<np.quantile(X_index[pair[0]],0.5))&(X_index[pair[1]]>=np.quantile(X_index[pair[1]],0.5))]    
-            elif i[0]==1 and i[1]==0:
-                sample_df=X_index[(X_index[pair[0]]>=np.quantile(X_index[pair[0]],0.5))&(X_index[pair[1]]<np.quantile(X_index[pair[1]],0.5))]    
-            elif i[0]==0 and i[1]==0:
-                sample_df=X_index[(X_index[pair[0]]<np.quantile(X_index[pair[0]],0.5))&(X_index[pair[1]]<np.quantile(X_index[pair[1]],0.5))]    
-        if coms.index(i)==1:
-            f1=np.median(shap_values[sample_df.index,guide_features.index(pair[0])])
-            f2_m=np.median(shap_values[sample_df.index,guide_features.index(pair[1])])
-        if coms.index(i)==2:
-            f2=np.median(shap_values[sample_df.index,guide_features.index(pair[1])])
-            f1_m=np.median(shap_values[sample_df.index,guide_features.index(pair[0])])
-   
-        tmp_1d.at[rank,marker[i[0]]+" / "+marker[i[1]]]=np.median(shap_values[sample_df.index,guide_features.index(pair[0])]+shap_values[sample_df.index,guide_features.index(pair[1])])
-    tmp_1d.at[rank,'expected_+/+']=f1+f2
-    tmp_1d.at[rank,'expected_-/-']=f1_m+f2_m
-tmp_1d.to_csv(output_file_name+"/interaction_pair_sumSHAPvalues.csv",index=False,sep='\t')
-# plots for the reported pairs 
-marker=['-','+']
-pairs=[['sequence_20_C','GC2728'],['sequence_20_G','GC2728'],['sequence_20_A','GG2728'],['GG2728','TG2526']]
-labels={'GC2728':'+1 C','sequence_20_G':'20 G','sequence_20_C':'20 C','GG2728':'+1 G','sequence_20_A':'20 A','TG2526':'P1 T'}
-sns.set_style('whitegrid')
-coms=[[0,0],[1,0],[0,1],[1,1]]
-for pair in pairs:
-    p=defaultdict(list)
-    for i in coms:
-        sample_df=X_index[(X_index[pair[0]]==i[0])&(X_index[pair[1]]==i[1])] 
-        if coms.index(i)==1:
-            f1=np.median(shap_values[sample_df.index,guide_features.index(pair[0])])
-        if coms.index(i)==2:
-            f2=np.median(shap_values[sample_df.index,guide_features.index(pair[1])])
-        sample_df=X_index[(X_index[pair[0]]==i[0])&(X_index[pair[1]]==i[1])] 
-        p['pattern']+=[marker[i[0]]+" / "+marker[i[1]]]*sample_df.shape[0]
-        p['value']+=list(shap_values[sample_df.index,guide_features.index(pair[0])]+shap_values[sample_df.index,guide_features.index(pair[1])])
-    p=pandas.DataFrame.from_dict(p)
-    plot=p.dropna()
-    plot=p[p['pattern']!='- / -']
-    plt.figure(figsize=(5,4))
-    ax=sns.boxplot(data=plot,x='pattern',y='value',order=['+ / -','- / +','+ / +'],color='lightgrey')
-    ax.axhline(f1+f2,color='r',xmin=0.7,xmax=0.98)
-    plt.xticks(rotation=0,fontsize='large')
-    plt.xlabel("")
-    plt.title(labels[pair[0]]+' / '+labels[pair[1]],fontsize='large')
-    plt.ylabel("sum SHAP value",fontsize='large')
-    plt.subplots_adjust(left=0.2)
-    plt.savefig(output_file_name+"/shap_dependence_plot_%s_%s.svg"%(pair[0],pair[1]),dpi=400)
-    plt.close()    
 
 print(time.asctime(),'Done.')     
 open(output_file_name + '/log.txt','a').write("Execution Time: %s seconds\n" %('{:.2f}'.format(time.time()-start)))    

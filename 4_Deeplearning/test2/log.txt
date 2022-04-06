@@ -1,0 +1,33 @@
+Python script: median_subtracting_model_DL.py
+Parsed arguments: Namespace(choice='crispron', folds=10, output='test2', split='gene', test_size=0.2, training='0,1,2')
+
+Total number of guides in dataset ../0_Datasets/E75_Rousset.csv: 59246
+Total number of guides in dataset ../0_Datasets/E18_Cui.csv: 59246
+Total number of guides in dataset ../0_Datasets/Wang_dataset.csv: 52104
+Training dataset: all 3 datasets
+Number of guides for essential genes: 8099 
+Number of guides after filtering: 7400 
+Number of guides in E75 Rousset/E18 Cui: 1618 
+Number of guides in Wang: 4164 
+Number of overlapping guides between Wang and Rousset/Cui: 378 
+Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.7327817156533764 , -1.199772302997543 
+Number of features: 9
+Features: sequence_30nt,guide_GC_content,distance_start_codon,distance_start_codon_perc,homopolymers,MFE_hybrid_full,MFE_hybrid_seed,MFE_homodimer_guide,MFE_monomer_guide
+Data input Time: 4.09 seconds
+
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f6ce93e5ac0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f6ce9189250>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f6ce925b9a0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f6ce925bac0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f6ce931bd00>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f6ce92c6f70>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f6ce95de5e0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f6ce95ebfa0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f6ce95c2250>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f6cd5f35850>
+Median Spearman correlation for all gRNAs of each gene: 
+E75 Rousset (median/mean): 0.33636363636363636 / 0.33025855101646273 
+E18 Cui (median/mean): 0.3571428571428572 / 0.32488545426510207 
+Wang (median/mean): 0.3222527472527472 / 0.28225051295400316 
+Mixed 3 datasets (median/mean): 0.3333333333333334 / 0.28225051295400316 
+Execution Time: 214.77 seconds
