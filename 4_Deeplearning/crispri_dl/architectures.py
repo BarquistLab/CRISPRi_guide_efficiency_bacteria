@@ -16,7 +16,6 @@ class Crispr1DCNN(pl.LightningModule):
 
     def __init__(self, num_features):
         super().__init__()
-     
 
         n = 32
         latent = 32
@@ -52,7 +51,7 @@ class Crispr1DCNN(pl.LightningModule):
 
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)        
+        optimizer = torch.optim.AdamW(self.parameters(), lr=1e-3)        
         return optimizer
 
 
@@ -153,7 +152,7 @@ class CrisprGRU(pl.LightningModule):
     
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)        
+        optimizer = torch.optim.AdamW(self.parameters(), lr=1e-3)        
         return optimizer
 
 

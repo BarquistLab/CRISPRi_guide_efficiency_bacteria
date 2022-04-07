@@ -514,6 +514,7 @@ def main():
         for i in list(df.index): #each iteration/CV split
             d=defaultdict(list)
             d['log2FC']+=list(df['log2FC'][i])
+            d['scaled_log2FC']+=list(df['scaled_log2FC'][i])
             d['pred']+=list(df['pred'][i])
             d['geneid']+=list(df['geneid'][i])
             d['dataset']+=list(df['dataset'][i])
@@ -522,7 +523,7 @@ def main():
                 D_dataset=D[D['dataset']==k]
                 for j in list(set(D_dataset['geneid'])):
                     D_gene=D_dataset[D_dataset['geneid']==j]
-                    sr,_=spearmanr(D_gene['log2FC'],-D_gene['pred']) 
+                    sr,_=spearmanr(D_gene['scaled_log2FC'],-D_gene['pred']) 
                     plot['sr'].append(sr)
                     plot['dataset'].append(k)
         plot=pandas.DataFrame.from_dict(plot)

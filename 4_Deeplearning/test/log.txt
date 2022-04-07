@@ -13,21 +13,21 @@ Number of overlapping guides between Wang and Rousset/Cui: 378
 Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.7327817156533764 , -1.199772302997543 
 Number of features: 9
 Features: sequence_30nt,guide_GC_content,distance_start_codon,distance_start_codon_perc,homopolymers,MFE_hybrid_full,MFE_hybrid_seed,MFE_homodimer_guide,MFE_monomer_guide
-Data input Time: 28.32 seconds
+Data input Time: 3.91 seconds
 
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c6676ac0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c64259d0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c641aa60>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c6571700>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c6566040>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c66397f0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c6853310>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c64694c0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3c686e940>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7fe3ab18a760>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ffa0c3d7ac0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ffa0c1869d0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ffa0c17bfd0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ffa0c2b86a0>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ffa0c2c8250>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ffa0c3d7520>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ffa0c419550>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ffa0c1cab80>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ffa0c28ef70>
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7ff9f8a15790>
 Median Spearman correlation for all gRNAs of each gene: 
-E75 Rousset (median/mean): 0.3214285714285715 / 0.2985230427622146 
-E18 Cui (median/mean): 0.3636363636363637 / 0.3097854223631701 
-Wang (median/mean): 0.31843156843156845 / 0.28388454409923364 
-Mixed 3 datasets (median/mean): 0.3303571428571428 / 0.28388454409923364 
-Execution Time: 7536.89 seconds
+E75 Rousset (median/mean): 0.3714285714285715 / 0.3424355922504478 
+E18 Cui (median/mean): 0.3714285714285715 / 0.3424355922504478 
+Wang (median/mean): 0.3336538461538461 / 0.2803416636264303 
+Mixed 3 datasets (median/mean): 0.34615384615384615 / 0.2803416636264303 
+Execution Time: 192.38 seconds
