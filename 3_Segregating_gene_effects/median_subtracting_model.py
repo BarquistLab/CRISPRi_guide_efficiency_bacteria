@@ -50,7 +50,7 @@ Which datasets to use:
 default: 0,1,2""")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
 parser.add_argument("-c", "--choice", default="rf", help="If train on random forest or LASSO model, rf/lasso. default: rf")
-parser.add_argument("-s", "--split", default='guide', help="train-test split stratege. guide/gene/guide_dropdistance/gene_dropdistance. guide_dropdistance: To test the models without distance associated features. default: guide")
+parser.add_argument("-s", "--split", default='gene', help="train-test split stratege. gene/gene_dropdistance. gene_dropdistance: To test the models without distance associated features. default: gene")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
 
@@ -143,11 +143,11 @@ def DataFrame_input(df):
     r75=df[df['dataset']==0]
     c18=df[df['dataset']==1]
     r75.index=r75['sequence']
-    r75=r75.loc[c18['sequence']]
+    r75=r75.loc[c18['sequence']] #align the gRNAs in two datasets
     c18.index=c18['sequence']
     scaled_log2FC_rc=dict()
     for i in r75.index:
-        scaled_log2FC_rc[i]=np.mean([r75['log2FC'][i],c18['log2FC'][i]])
+        scaled_log2FC_rc[i]=np.mean([r75['log2FC'][i],c18['log2FC'][i]]) # calculate the mean logFC as sacled logFC
     for i in df.index:
         if df['dataset'][i] in [0,1]:
             df.at[i,'scaled_log2FC']=scaled_log2FC_rc[df['sequence'][i]]
@@ -161,16 +161,16 @@ def DataFrame_input(df):
         if gene in list(r75['geneid']):
             w_gene=w[w['geneid']==gene]
             r_gene=r75[r75['geneid']==gene]
-            overlap_pos=[pos for pos in list(w_gene['distance_start_codon']) if pos in list(r_gene['distance_start_codon'])]
+            overlap_pos=[pos for pos in list(w_gene['distance_start_codon']) if pos in list(r_gene['distance_start_codon'])] #record overlapping gRNAs in each gene
             if len(overlap_pos)==0:
                 continue
             for pos in overlap_pos:
                 w_pos=w_gene[w_gene['distance_start_codon']==pos]
                 r_pos=r_gene[r_gene['distance_start_codon']==pos]
-                w_overlap_log2fc.append(sum(w_pos['log2FC']))
-                r_overlap_log2fc.append(sum(r_pos['scaled_log2FC']))
-                w_overlap_seq.append(list(w_pos['sequence'])[0])
-    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(w_overlap_log2fc,r_overlap_log2fc) 
+                w_overlap_log2fc.append(sum(w_pos['log2FC'])) #the logFC of overlapping gRNA in Wang
+                r_overlap_log2fc.append(sum(r_pos['scaled_log2FC'])) #the scaled logFC of overlapping gRNA in Rousset
+                w_overlap_seq.append(list(w_pos['sequence'])[0]) #record overlapping gRNAs in Wang to exclude them
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(w_overlap_log2fc,r_overlap_log2fc) # fit linear regression
     logging_file.write("Number of guides in Wang: %s \n" % w.shape[0]) 
     logging_file.write("Number of overlapping guides between Wang and Rousset/Cui: %s \n" % len(w_overlap_log2fc))  
     logging_file.write("Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: %s , %s \n" % (slope,intercept))      
@@ -236,23 +236,17 @@ def DataFrame_input(df):
     guide_sequence_set=list(dict.fromkeys(df['sequence']))
     for i in df.index:
         df.at[i,'geneid']=int(df['geneid'][i][1:])
-        df.at[i,'guideid']=guide_sequence_set.index(df['sequence'][i])
+        # df.at[i,'guideid']=guide_sequence_set.index(df['sequence'][i])
         PAM_encoded.append(self_encode(df['PAM'][i]))
         sequence_encoded.append(self_encode(df['sequence'][i]))
         dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
     
-    #define guideid based on chosen split method
-    if split=='guide' or split=='guide_dropdistance':
-        guideids=np.array(list(df['guideid']))
-    elif split=='gene':
-        guideids=np.array(list(df['geneid']))
-    else:
-        print('Unexpected split method...')
-        sys.exit()
+    #define guideid
+    guideids=np.array(list(df['geneid']))
     # remove columns that are not used in training
     drop_features=['training','scaled_log2FC','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
-    if split=='guide_dropdistance':
+    if split=='gene_dropdistance':
         drop_features+=["distance_start_codon","distance_start_codon_perc"]#,'guide_GC_content', 'homopolymers', 'MFE_hybrid_full', 'MFE_hybrid_seed', 'MFE_homodimer_guide', 'MFE_monomer_guide']
     for feature in drop_features:
         try:
@@ -467,8 +461,7 @@ def main():
         open(output_file_name + '/log.txt','a').write("Hyperopt estimated optimum {}".format(params)+"\n\n")
         estimator=linear_model.Lasso(random_state = np.random.seed(111),**params)
         ### tested optimized lasso
-        # estimator=linear_model.Lasso(random_state = np.random.seed(111),alpha=0.010780717789770466, copy_X=True, fit_intercept=True,max_iter=1000, normalize=False, positive=False, precompute=False,selection='cyclic', tol=0.0001, warm_start=False)
-        
+        # estimator=linear_model.Lasso(alpha=0.006978754283387303, copy_X=True, fit_intercept=True,max_iter=1000, normalize=False, positive=False, precompute=False,random_state= np.random.seed(111), selection='cyclic', tol=0.0001, warm_start=False)
         
     open(output_file_name + '/log.txt','a').write("Estimator:"+str(estimator)+"\n")
     
@@ -489,10 +482,7 @@ def main():
             gene_df=test_data[test_data['geneid']==i]
             for j in gene_df.index:
                 pasteur_test.at[j,'median']=statistics.median(gene_df['log2FC'])
-                if split=='guide' or split=='guide_dropdistance':
-                    pasteur_test.at[j,'guideid']=guide_sequence_set.index(pasteur_test['sequence'][j])
-                elif split=='gene':
-                    pasteur_test.at[j,'guideid']=int(pasteur_test['geneid'][j][1:])
+                pasteur_test.at[j,'guideid']=int(pasteur_test['geneid'][j][1:])
                 pasteur_test.at[j,'activity_score']=statistics.median(gene_df['log2FC'])-pasteur_test['log2FC'][j]
     #k-fold cross validation
     evaluations=defaultdict(list)
@@ -504,7 +494,7 @@ def main():
         train_index = np.array(guideid_set)[train_index]
         test_index = np.array(guideid_set)[test_index]
         train = X_df[X_df['guideid'].isin(train_index)]
-        train=train[train['training_tag']==1]
+        train=train[train['training_tag']==1] #only used
         X_train=train[train['dataset_col'].isin(training_sets)]
         y_train=np.array(X_train['activity'])
         X_train=np.array(X_train[headers])
@@ -520,7 +510,6 @@ def main():
         
         iteration+=1
         iteration_predictions['log2FC'].append(list(log2FC_test))
-        iteration_predictions['scaled_log2FC'].append(list(scaled_log2FC_test))
         iteration_predictions['pred'].append(list(predictions))
         iteration_predictions['iteration'].append([iteration]*len(y_test))
         iteration_predictions['dataset'].append(list(test['dataset_col']))
@@ -616,31 +605,29 @@ def main():
     elif choice=='rf':
         SHAP(estimator,X_train,headers)
         
-    if split=='gene':
-        logging_file.write("Median Spearman correlation for all gRNAs of each gene: \n")
-        labels= ['E75 Rousset','E18 Cui','Wang']
-        df=iteration_predictions.copy()
-        plot=defaultdict(list)
-        for i in list(df.index): #each iteration/CV split
-            d=defaultdict(list)
-            d['log2FC']+=list(df['log2FC'][i])
-            d['scaled_log2FC']+=list(df['scaled_log2FC'][i])
-            d['pred']+=list(df['pred'][i])
-            d['geneid']+=list(df['geneid'][i])
-            d['dataset']+=list(df['dataset'][i])
-            D=pandas.DataFrame.from_dict(d)
-            for k in range(3):
-                D_dataset=D[D['dataset']==k]
-                for j in list(set(D_dataset['geneid'])):
-                    D_gene=D_dataset[D_dataset['geneid']==j]
-                    sr,_=spearmanr(D_gene['scaled_log2FC'],-D_gene['pred']) 
-                    plot['sr'].append(sr)
-                    plot['dataset'].append(k)
-        plot=pandas.DataFrame.from_dict(plot)
+    logging_file.write("Median Spearman correlation for all gRNAs of each gene: \n")
+    labels= ['E75 Rousset','E18 Cui','Wang']
+    df=iteration_predictions.copy()
+    plot=defaultdict(list)
+    for i in list(df.index): #each iteration/CV split
+        d=defaultdict(list)
+        d['log2FC']+=list(df['log2FC'][i])
+        d['pred']+=list(df['pred'][i])
+        d['geneid']+=list(df['geneid'][i])
+        d['dataset']+=list(df['dataset'][i])
+        D=pandas.DataFrame.from_dict(d)
         for k in range(3):
-            p=plot[plot['dataset']==k]
-            logging_file.write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
-        logging_file.write("Mixed 3 datasets (median/mean): %s / %s \n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
+            D_dataset=D[D['dataset']==k]
+            for j in list(set(D_dataset['geneid'])):
+                D_gene=D_dataset[D_dataset['geneid']==j]
+                sr,_=spearmanr(D_gene['log2FC'],-D_gene['pred']) 
+                plot['sr'].append(sr)
+                plot['dataset'].append(k)
+    plot=pandas.DataFrame.from_dict(plot)
+    for k in range(3):
+        p=plot[plot['dataset']==k]
+        logging_file.write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
+    logging_file.write("Mixed 3 datasets (median/mean): %s / %s \n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
     logging_file.close()
     print(time.asctime(),'Done.')
 

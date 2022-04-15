@@ -58,7 +58,7 @@ Which datasets to use:
 default: 0,1,2""")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
 parser.add_argument("-c", "--choice", default="cnn", help="If train on CNN or GRU model, cnn/gru/crispron. default: cnn")
-parser.add_argument("-s", "--split", default='guide', help="train-test split stratege. guide/gene. default: guide")
+# parser.add_argument("-s", "--split", default='gene', help="train-test split stratege. gene. default: guide")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
 
@@ -71,7 +71,7 @@ if training_sets != None:
         training_sets=[int(training_sets)]
 else:
     training_sets=list(range(3))
-split=args.split
+# split=args.split
 folds=args.folds
 test_size=args.test_size
 output_file_name=args.output
@@ -236,10 +236,7 @@ def DataFrame_input(df):
     
     log2FC=np.array(df['log2FC'],dtype=float)
     #define guideid based on chosen split method
-    if split=='guide':
-        guideids=np.array(list(df['guideid']))
-    elif split=='gene':
-        guideids=np.array(list(df['geneid']))
+    guideids=np.array(list(df['geneid']))
     
     # remove columns that are not used in training
     drop_features=['scaled_log2FC','training','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
@@ -427,7 +424,6 @@ def main():
         predictions = predictions_test[0].cpu().numpy().flatten()
         fold_inner+=1
         iteration_predictions['log2FC'].append(list(log2FC_test))
-        iteration_predictions['scaled_log2FC'].append(list(scaled_log2FC_test))
         iteration_predictions['pred'].append(list(predictions))
         iteration_predictions['iteration'].append([fold_inner]*len(y_test))
         iteration_predictions['dataset'].append(list(test['dataset_col']))
@@ -505,32 +501,30 @@ def main():
         estimator.fit(CrisprGRU(len(header)), train_dataloader = loader_train, val_dataloaders = loader_val)  
     elif choice=='crispron':
         estimator.fit(CrisprOn1DCNN(len(header)), train_dataloader = loader_train, val_dataloaders = loader_val)  
-    if split=='gene':
-        logging_file= open(output_file_name + '/log.txt','a')
-        logging_file.write("Median Spearman correlation for all gRNAs of each gene: \n")
-        labels= ['E75 Rousset','E18 Cui','Wang']
-        df=iteration_predictions.copy()
-        plot=defaultdict(list)
-        for i in list(df.index): #each iteration/CV split
-            d=defaultdict(list)
-            d['log2FC']+=list(df['log2FC'][i])
-            d['scaled_log2FC']+=list(df['scaled_log2FC'][i])
-            d['pred']+=list(df['pred'][i])
-            d['geneid']+=list(df['geneid'][i])
-            d['dataset']+=list(df['dataset'][i])
-            D=pandas.DataFrame.from_dict(d)
-            for k in training_sets:
-                D_dataset=D[D['dataset']==k]
-                for j in list(set(D_dataset['geneid'])):
-                    D_gene=D_dataset[D_dataset['geneid']==j]
-                    sr,_=spearmanr(D_gene['scaled_log2FC'],-D_gene['pred']) 
-                    plot['sr'].append(sr)
-                    plot['dataset'].append(k)
-        plot=pandas.DataFrame.from_dict(plot)
+    logging_file= open(output_file_name + '/log.txt','a')
+    logging_file.write("Median Spearman correlation for all gRNAs of each gene: \n")
+    labels= ['E75 Rousset','E18 Cui','Wang']
+    df=iteration_predictions.copy()
+    plot=defaultdict(list)
+    for i in list(df.index): #each iteration/CV split
+        d=defaultdict(list)
+        d['log2FC']+=list(df['log2FC'][i])
+        d['pred']+=list(df['pred'][i])
+        d['geneid']+=list(df['geneid'][i])
+        d['dataset']+=list(df['dataset'][i])
+        D=pandas.DataFrame.from_dict(d)
         for k in training_sets:
-            p=plot[plot['dataset']==k]
-            logging_file.write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
-        logging_file.write("Mixed 3 datasets (median/mean): %s / %s \n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
+            D_dataset=D[D['dataset']==k]
+            for j in list(set(D_dataset['geneid'])):
+                D_gene=D_dataset[D_dataset['geneid']==j]
+                sr,_=spearmanr(D_gene['log2FC'],-D_gene['pred']) 
+                plot['sr'].append(sr)
+                plot['dataset'].append(k)
+    plot=pandas.DataFrame.from_dict(plot)
+    for k in training_sets:
+        p=plot[plot['dataset']==k]
+        logging_file.write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
+    logging_file.write("Mixed 3 datasets (median/mean): %s / %s \n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
     print(time.asctime(),'Done.')
 if __name__ == '__main__':
     main()

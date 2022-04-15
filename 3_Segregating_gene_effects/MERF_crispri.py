@@ -50,7 +50,7 @@ Which datasets to use:
 default: 0,1,2""")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
 parser.add_argument("-c", "--choice", default="", help="If train on simplified random-effect model with CAI values, -c CAI. default: None")
-parser.add_argument("-s", "--split", default='guide', help="train-test split stratege. guide/gene/guide_dropdistance/gene_dropdistance. guide_dropdistance: To test the models without distance associated features. default: guide")
+parser.add_argument("-s", "--split", default='gene', help="train-test split stratege. gene/gene_dropdistance. guide_dropdistance: To test the models without distance associated features. default: gene")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
 args = parser.parse_args()
@@ -147,8 +147,8 @@ def DataFrame_input(df):
     df=df[df['nr_guides']>=5]
     logging.info("Number of guides after filtering: %s \n" % df.shape[0])
     
-    guide_sequence_set=list(dict.fromkeys(df['sequence']))
-    df['guideid']=[0]*df.shape[0]
+    # guide_sequence_set=list(dict.fromkeys(df['sequence']))
+    # df['guideid']=[0]*df.shape[0]
     # clusters=[str(i)+"_"+str(j) for i,j in zip(list(df['geneid']),list(df['dataset']))] #
     ### one hot encoded sequence features
     PAM_encoded=[]
@@ -161,21 +161,15 @@ def DataFrame_input(df):
             except KeyError:
                 df.at[i,'CAI']=0
         df.at[i,'geneid']=int(df['geneid'][i][1:])
-        df.at[i,'guideid']=guide_sequence_set.index(df['sequence'][i])
+        # df.at[i,'guideid']=guide_sequence_set.index(df['sequence'][i])
         PAM_encoded.append(self_encode(df['PAM'][i]))
         sequence_encoded.append(self_encode(df['sequence'][i]))   
         dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
     #define guideid based on chosen split method
-    if split=='guide' or split=='guide_dropdistance':
-        guideids=np.array(list(df['guideid']))
-    elif split=='gene' or split=='gene_dropdistance':
-        guideids=np.array(list(df['geneid']))
-    else:
-        print('Unexpected split method...')
-        sys.exit()
+    guideids=np.array(list(df['geneid']))
     clusters=list(df['geneid'])
     medians=np.array(df['median'])
-    cols=np.array(df['dataset'])
+    # cols=np.array(df['dataset'])
     #drop features
     y=np.array(df['log2FC'],dtype=float)
     drop_features=['std','nr_guides','median','guideid','log2FC',"intergenic","No.","genename","coding_strand",'geneid',
@@ -183,7 +177,7 @@ def DataFrame_input(df):
                    'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
     if 'CAI' in choice:
         drop_features=drop_features+["distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_expression_min","gene_expression_max"]
-    if split=='guide_dropdistance' or split=='gene_dropdistance':
+    if split=='gene_dropdistance':
         drop_features+=["distance_start_codon","distance_start_codon_perc"]
     for feature in drop_features:
         try:
@@ -193,7 +187,7 @@ def DataFrame_input(df):
     
     X=df.copy()
     # dataframe for gene features (random-effect model)
-    gene_fea=['dataset','geneid',"gene_GC_content","distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_length","gene_expression_min","gene_expression_max",'CAI']#
+    gene_fea=['dataset',"gene_GC_content","distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_length","gene_expression_min","gene_expression_max",'CAI']#
     headers=list(X.columns.values)
     gene_features=[item for item in gene_fea if item in headers]
     if choice =='only_dataset':
@@ -221,7 +215,7 @@ def DataFrame_input(df):
     logging.info('Guide features: %s'%",".join(guide_features))
     logging.info('Gene features: %s'%",".join(gene_features))
     
-    return X_gene,X_guide, y, gene_features,guide_features,guideids,clusters,medians,cols
+    return X_gene,X_guide, y, gene_features,guide_features,guideids,clusters,medians
 
 
 
@@ -243,7 +237,7 @@ open(output_file_name + '/log.txt','a').write("Total number of guides in dataset
 open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[1],rousset18.shape[0]))
 open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],wang.shape[0]))
 open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
-X_gene,X_guide, y, gene_features,guide_features,guideids,clusters,medians,datasets=DataFrame_input(combined)
+X_gene,X_guide, y, gene_features,guide_features,guideids,clusters,medians=DataFrame_input(combined)
 
 open(output_file_name + '/log.txt','a').write("Number of clusters: %s\n" % len(set(clusters)))
 open(output_file_name + '/log.txt','a').write("Done processing input: %s s\n\n"%round(time.time()-start,3))
@@ -257,7 +251,7 @@ estimator=RandomForestRegressor(bootstrap=True, criterion='friedman_mse', max_de
 
 open( output_file_name+ '/log.txt','a').write("Estimator:"+str(estimator)+"\n\n\n")
 guide_features=X_guide.columns.values.tolist()
-X_df=pandas.DataFrame(data=np.c_[X_gene,X_guide,y,clusters,guideids,medians,datasets],columns=gene_features+guide_features+['log2FC','clusters','guideid','median','dataset'])
+X_df=pandas.DataFrame(data=np.c_[X_gene,X_guide,y,clusters,guideids,medians],columns=gene_features+guide_features+['log2FC','clusters','guideid','median'])
 X_df = X_df.loc[:,~X_df.columns.duplicated()]
 guideid_set=list(set(guideids)) 
 dtypes=dict()
@@ -312,49 +306,6 @@ for train_index, test_index in kf.split(guideid_set):##split the combined traini
     iteration_predictions['iteration'].append(iteration)
     iteration_predictions['dataset'].append(list(test['dataset']))
     iteration_predictions['clusters'].append(list(test['clusters']))
-    # random effect coef
-    if split=='guide' or split=='guide_dropdistance': 
-        coef=pandas.DataFrame(mrf_lgbm.trained_b,index=mrf_lgbm.trained_b.index) #coef from the trained random effect model
-        train_re = train.groupby("clusters").mean()
-        train_re=train_re.loc[np.array(mrf_lgbm.trained_b.index)]
-        Z_train_re=np.array(train_re[gene_features])
-        pred_train=np.sum(coef * Z_train_re,axis=1)
-        for i in pred_train.index:
-            train_gene=train[train['clusters']==i]
-            for j in train_gene.index:
-                train.at[j,'gene_pred']=pred_train[i] #prediction from random-effect model for train
-           
-        
-        cluster_counts = clusters_test.value_counts() #
-        inds=[i for i in mrf_lgbm.trained_b.index if i in list(clusters_test)]
-        coef=coef.loc[inds]
-        test_re = test.groupby("clusters").mean() # group the test with cluster ids
-        test_re=test_re.loc[inds] # select the clusters in training set 
-        Z_test_re=np.array(test_re[gene_features])
-        pred_test=np.sum(coef * Z_test_re,axis=1)
-        for i in pred_test.index:
-            test_gene=test[test['clusters']==i]
-            for j in test_gene.index:
-                test.at[j,'gene_pred']=pred_test[i]  #prediction from random-effect model for test
-
-        # test in 3 datasets
-        predictions = mrf_lgbm.predict(X_test, Z_test, clusters_test)        
-        spearman_rho,_=spearmanr(np.array(y_test), np.array(predictions))
-        pearsonr_rho,_=pearsonr(np.array(y_test), np.array(predictions))
-        evaluations['Rs_depletion'].append(spearman_rho) # depletion comparison
-        evaluations['Rs_activity'].append(spearmanr(np.array(y_test-test['gene_pred']), mrf_lgbm.trained_fe_model.predict(X_test),nan_policy='omit')[0]) # activity score comparison
-        for dataset in training_sets:
-            test_1 = test[test['dataset']==dataset]
-            y_test=test_1['log2FC']
-            X_test=test_1[guide_features]
-            Z_test=test_1[gene_features]
-            clusters_test=test_1['clusters']
-            
-            predictions_1 = mrf_lgbm.predict(X_test, Z_test, clusters_test)        
-            spearman_rho,spearman_p_value=spearmanr(np.array(y_test), np.array(predictions_1))
-            evaluations['Rs_depletion_test%s'%(dataset+1)].append(spearman_rho)
-            if split=='guide' or split=='guide_dropdistance':
-                evaluations['Rs_activity_test%s'%(dataset+1)].append(spearmanr(np.array(y_test-test_1['gene_pred']), mrf_lgbm.trained_fe_model.predict(X_test),nan_policy='omit')[0])
     
 evaluations=pandas.DataFrame.from_dict(evaluations)
 evaluations.to_csv(output_file_name+'/iteration_scores.csv',sep='\t',index=True)
@@ -362,30 +313,29 @@ iteration_predictions=pandas.DataFrame.from_dict(iteration_predictions)
 iteration_predictions.to_csv(output_file_name+'/iteration_predictions.csv',sep='\t',index=False)
 open(output_file_name + '/log.txt','a').write("\n\nDone 10-fold CV: %s s\n\n\n"%round(time.time()-start,3))
 
-if split=='gene':
-    open(output_file_name + '/log.txt','a').write("Median Spearman correlation for all gRNAs of each gene: \n")
-    labels= ['E75 Rousset','E18 Cui','Wang']
-    df=iteration_predictions.copy()
-    plot=defaultdict(list)
-    for i in list(df.index):
-        d=defaultdict(list)
-        d['log2FC']+=list(df['log2FC'][i])
-        d['pred']+=list(df['pred'][i])
-        d['clusters']+=list(df['clusters'][i])
-        d['dataset']+=list(df['dataset'][i])
-        D=pandas.DataFrame.from_dict(d)
-        for k in range(3):
-            D_dataset=D[D['dataset']==k]
-            for j in list(set(D_dataset['clusters'])):
-                D_gene=D_dataset[D_dataset['clusters']==j]
-                sr,_=spearmanr(D_gene['log2FC'],D_gene['pred']) 
-                plot['sr'].append(sr)
-                plot['dataset'].append(k)
-    plot=pandas.DataFrame.from_dict(plot)
+open(output_file_name + '/log.txt','a').write("Median Spearman correlation for all gRNAs of each gene: \n")
+labels= ['E75 Rousset','E18 Cui','Wang']
+df=iteration_predictions.copy()
+plot=defaultdict(list)
+for i in list(df.index):
+    d=defaultdict(list)
+    d['log2FC']+=list(df['log2FC'][i])
+    d['pred']+=list(df['pred'][i])
+    d['clusters']+=list(df['clusters'][i])
+    d['dataset']+=list(df['dataset'][i])
+    D=pandas.DataFrame.from_dict(d)
     for k in range(3):
-        p=plot[plot['dataset']==k]
-        open(output_file_name + '/log.txt','a').write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
-    open(output_file_name + '/log.txt','a').write("Mixed 3 datasets (median/mean): %s / %s \n\n\n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
+        D_dataset=D[D['dataset']==k]
+        for j in list(set(D_dataset['clusters'])):
+            D_gene=D_dataset[D_dataset['clusters']==j]
+            sr,_=spearmanr(D_gene['log2FC'],D_gene['pred']) 
+            plot['sr'].append(sr)
+            plot['dataset'].append(k)
+plot=pandas.DataFrame.from_dict(plot)
+for k in range(3):
+    p=plot[plot['dataset']==k]
+    open(output_file_name + '/log.txt','a').write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
+open(output_file_name + '/log.txt','a').write("Mixed 3 datasets (median/mean): %s / %s \n\n\n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
 
 print(time.asctime(),'Start saving model...')    
 #save model trained with all guides
@@ -601,25 +551,6 @@ plt.savefig(output_file_name+'/feature_effects_random_effect_model.svg',dpi=400)
 # plt.show()
 plt.close()
 
-if split=='guide' or split=='guide_dropdistance':
-    # cluster_counts = clusters_test.value_counts()
-    inds=[i for i in mrf_lgbm.trained_b.index if i in list(clusters_test)]
-    coef=coef.loc[inds]
-    test_re = test.groupby("clusters").mean()
-    test_re=test_re.loc[inds]
-    median_test_re=test_re['median']
-    # coef=coef.loc[np.array(cluster_counts.index)]
-    Z_test_re=np.array(test_re[gene_features])
-    pred_test=np.sum(coef * Z_test_re,axis=1)
-    for i in pred_test.index:
-        test_gene=test[test['clusters']==i]
-        for j in test_gene.index:
-            test.at[j,'gene_pred']=pred_test[i]
-    test_re['gene_pred']=pred_test
-    test_re['random_med'] = abs(test_re['median'] - test_re['gene_pred'])
-    open(output_file_name + '/log.txt','a').write("Spearman corelation between random effects and median logFC (test): {0}\n\n".format(spearmanr(median_test_re,pred_test)[0]))
-
-
 
 #scatter plot of whole MERF model
 test['pred'] = mrf_lgbm.predict(X_test,Z_test,clusters_test) 
@@ -669,39 +600,6 @@ plt.savefig(output_file_name+"/fixed_train.png",dpi=400)
 # plt.show()
 plt.close()
 
-if split=='guide' or split=='guide_dropdistance':
-    labels= ['E75 Rousset','E18 Cui','Wang']
-    markers=['x','D','s']
-
-    plt.figure()
-    for data in training_sets:
-        median_dataset=test[test['dataset']==data]
-        median_dataset=median_dataset.groupby('clusters').mean()
-        ax=sns.scatterplot(median_dataset['median'],median_dataset['gene_pred'],label=labels[data],marker=markers[data],alpha=0.5,edgecolors='white')
-        plt.text(0.65,0.1-data*0.05,labels[data]+" Spearman R: {0}".format(round(spearmanr(median_dataset['median'],median_dataset['gene_pred'])[0],3)),transform=ax.transAxes,fontsize='x-small')
-    plt.legend()
-    plt.xlabel("Median log2FC of gRNAs for each gene")
-    plt.ylabel("Predicted Random effects")
-    plt.xticks(fontsize=14)
-    plt.yticks(fontsize=14)
-    # plt.title('Test')
-    plt.savefig(output_file_name+"/random_median_test.svg",dpi=400)
-    # plt.show()
-    plt.close()
-
-    plt.figure()
-    for data in training_sets:
-        test_dataset=test[test['dataset']==data]
-        X_dataset=test_dataset[guide_features]
-        ax=sns.scatterplot(test_dataset['log2FC']-test_dataset['gene_pred'],mrf_lgbm.trained_fe_model.predict(X_dataset),marker=markers[data],label=labels[data],alpha=0.5)
-        plt.text(0.65,0.1-data*0.05,labels[data]+" Spearman R: {0}".format(round(spearmanr(test_dataset['log2FC']-test_dataset['gene_pred'],mrf_lgbm.trained_fe_model.predict(test_dataset[guide_features]))[0],3)),transform=ax.transAxes,fontsize='x-small')
-    plt.legend(loc='upper left')
-    plt.xlabel("Residual of logFC")
-    plt.ylabel("Predicted Fixed effects")
-    # plt.title('Test')
-    plt.savefig(output_file_name+"/fixed_test.png",dpi=400)
-    # plt.show()
-    plt.close()
     
 
 print(time.asctime(),'Done.')     
