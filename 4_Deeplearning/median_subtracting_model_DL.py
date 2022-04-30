@@ -58,7 +58,7 @@ Which datasets to use:
 default: 0,1,2""")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
 parser.add_argument("-c", "--choice", default="cnn", help="If train on CNN or GRU model, cnn/gru/crispron. default: cnn")
-# parser.add_argument("-s", "--split", default='gene', help="train-test split stratege. gene. default: guide")
+# parser.add_argument("-s", "--split", default='gene', help="train-test split stratege. gene. default: gene")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
 
@@ -178,7 +178,10 @@ def DataFrame_input(df):
     slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(w_overlap_log2fc,r_overlap_log2fc) 
     logging_file.write("Number of guides in Wang: %s \n" % w.shape[0]) 
     logging_file.write("Number of overlapping guides between Wang and Rousset/Cui: %s \n" % len(w_overlap_log2fc))  
-    logging_file.write("Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: %s , %s \n" % (slope,intercept))      
+    logging_file.write("Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: %s , %s \n" % (round(slope,6),round(intercept,6)))      
+    
+    slope=round(slope,6)
+    intercept=round(intercept,6)
     
     plt.scatter(w_overlap_log2fc,r_overlap_log2fc,color='skyblue',edgecolors='white')
     plt.plot(w_overlap_log2fc,np.array(w_overlap_log2fc)*slope+intercept,color='red')

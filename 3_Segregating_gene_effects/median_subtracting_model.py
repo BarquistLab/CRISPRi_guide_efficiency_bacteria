@@ -173,7 +173,10 @@ def DataFrame_input(df):
     slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(w_overlap_log2fc,r_overlap_log2fc) # fit linear regression
     logging_file.write("Number of guides in Wang: %s \n" % w.shape[0]) 
     logging_file.write("Number of overlapping guides between Wang and Rousset/Cui: %s \n" % len(w_overlap_log2fc))  
-    logging_file.write("Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: %s , %s \n" % (slope,intercept))      
+    logging_file.write("Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: %s , %s \n" % (round(slope,6),round(intercept,6)))      
+    
+    slope=round(slope,6)
+    intercept=round(intercept,6)
     
     plt.scatter(w_overlap_log2fc,r_overlap_log2fc,color='skyblue',edgecolors='white')
     plt.plot(w_overlap_log2fc,np.array(w_overlap_log2fc)*slope+intercept,color='red')
@@ -322,7 +325,7 @@ def SHAP(estimator,X,headers):
     
     shap.summary_plot(shap_values, X, plot_type="bar",show=False,color_bar=True,max_display=10)
     plt.subplots_adjust(left=0.35, top=0.95)
-    plt.savefig(output_file_name+"/shap_value_bar.png",dpi=400)
+    plt.savefig(output_file_name+"/shap_value_bar.svg",dpi=400)
     plt.close()
     
     for i in [10,15,30]:
@@ -330,7 +333,7 @@ def SHAP(estimator,X,headers):
         plt.subplots_adjust(left=0.45, top=0.95,bottom=0.2)
         plt.yticks(fontsize='small')
         plt.xticks(fontsize='small')
-        plt.savefig(output_file_name+"/shap_value_top%s.png"%(i),dpi=400)
+        plt.savefig(output_file_name+"/shap_value_top%s.svg"%(i),dpi=400)
         plt.close()    
 def encode(seq):
     return np.array([[int(b==p) for b in seq] for p in ["A","T","G","C"]])
@@ -460,7 +463,7 @@ def main():
         params = trials.trials[idx]["result"]["params"]
         open(output_file_name + '/log.txt','a').write("Hyperopt estimated optimum {}".format(params)+"\n\n")
         estimator=linear_model.Lasso(random_state = np.random.seed(111),**params)
-        ### tested optimized lasso
+        ### tested optimized lasso for split=='gene'
         # estimator=linear_model.Lasso(alpha=0.006978754283387303, copy_X=True, fit_intercept=True,max_iter=1000, normalize=False, positive=False, precompute=False,random_state= np.random.seed(111), selection='cyclic', tol=0.0001, warm_start=False)
         
     open(output_file_name + '/log.txt','a').write("Estimator:"+str(estimator)+"\n")
@@ -574,7 +577,21 @@ def main():
     pickle.dump(estimator, open(filename, 'wb')) 
     filename = output_file_name+'/saved_model/CRISPRi_headers.sav'
     pickle.dump(headers, open(filename, 'wb'))
-    
+    print(time.asctime(),'Start model interpretation...')
+    ### model validation with validation dataset
+    if choice =='lasso':
+        coef=pandas.DataFrame(data={'coef':estimator.coef_,'feature':headers})
+        coef=coef.sort_values(by='coef',ascending=False)
+        coef=coef[:15]
+        pal = sns.color_palette('pastel')
+        sns.barplot(data=coef,x='feature',y='coef',color=pal.as_hex()[0])
+        plt.xticks(rotation=90)
+        plt.subplots_adjust(bottom=0.35)
+        plt.savefig(output_file_name+"/coef.svg",dpi=400)
+        plt.close()
+    elif choice=='rf':
+        SHAP(estimator,X_all,headers)
+        
     ##split the combined training set into train and test
     guide_train, guide_test = sklearn.model_selection.train_test_split(guideid_set, test_size=test_size,random_state=np.random.seed(111))  
     
@@ -590,21 +607,7 @@ def main():
     estimator.fit(X_train,y_train)
     predictions = estimator.predict(X_test)
     Evaluation(output_file_name,y_test,predictions,"X_test")
-    print(time.asctime(),'Start model interpretation...')
-    ### model validation with validation dataset
-    if choice =='lasso':
-        coef=pandas.DataFrame(data={'coef':estimator.coef_,'feature':headers})
-        coef=coef.sort_values(by='coef',ascending=False)
-        coef=coef[:15]
-        pal = sns.color_palette('pastel')
-        sns.barplot(data=coef,x='feature',y='coef',color=pal.as_hex()[0])
-        plt.xticks(rotation=90)
-        plt.subplots_adjust(bottom=0.35)
-        plt.savefig(output_file_name+"/coef.svg",dpi=400)
-        plt.close()
-    elif choice=='rf':
-        SHAP(estimator,X_train,headers)
-        
+    
     logging_file.write("Median Spearman correlation for all gRNAs of each gene: \n")
     labels= ['E75 Rousset','E18 Cui','Wang']
     df=iteration_predictions.copy()
