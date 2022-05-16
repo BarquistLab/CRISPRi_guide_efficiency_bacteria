@@ -313,5 +313,5 @@ def main():
 
 if __name__ == '__main__':
     main()
-    open(output_file_name + '/Output.txt','a').write("Execution Time: %s seconds\n" %('{:.2f}'.format(time.time()-start_time)))    
+    open(output_file_name + '/log.txt','a').write("Execution Time: %s seconds\n" %('{:.2f}'.format(time.time()-start_time)))    
 #%%

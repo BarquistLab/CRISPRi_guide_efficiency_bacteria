@@ -210,14 +210,14 @@ def DataFrame_input(df):
     plt.xlabel("Activity scores (before scaling)")
     plt.savefig(output_file_name+"/activity_score_before.svg", dpi=150)
     plt.close()
-    for dataset in range(len(datasets)):
-        dataset_df=df[df['dataset']==dataset]
-        for i in list(set(dataset_df['geneid'])):
-            gene_df=dataset_df[dataset_df['geneid']==i]
-            median=statistics.median(gene_df['scaled_log2FC'])
-            for j in gene_df.index:
-                df.at[j,'median']=median
-                df.at[j,'activity_score']=median-df['scaled_log2FC'][j]
+
+    #calculate the activity scores for each gene in 3 datasets based on scaled logFC
+    for i in list(set(df['geneid'])):
+        gene_df=df[df['geneid']==i]
+        median=statistics.median(gene_df['scaled_log2FC'])
+        for j in gene_df.index:
+            df.at[j,'median']=median
+            df.at[j,'activity_score']=median-df['scaled_log2FC'][j]
     
     for i in range(3):
         sns.distplot(df[df['dataset']==i]['scaled_log2FC'],label=dataset_labels[i],hist=False)
