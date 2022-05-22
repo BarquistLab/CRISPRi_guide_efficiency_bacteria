@@ -143,100 +143,101 @@ def DataFrame_input(df):
     df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from each datasets
     logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
     
-    import scipy
-    print(time.asctime(),'Preprocessing...')
-    r75=df[df['dataset']==0]
-    c18=df[df['dataset']==1]
-    r75.index=r75['sequence']
-    r75=r75.loc[c18['sequence']]
-    c18.index=c18['sequence']
-    scaled_log2FC_rc=dict()
-    for i in r75.index:
-        scaled_log2FC_rc[i]=np.mean([r75['log2FC'][i],c18['log2FC'][i]])
-    for i in df.index:
-        if df['dataset'][i] in [0,1]:
-            df.at[i,'scaled_log2FC']=scaled_log2FC_rc[df['sequence'][i]]
-    logging_file.write("Number of guides in E75 Rousset/E18 Cui: %s \n" % r75.shape[0])        
-    w=df[df['dataset']==2]
-    r75=df[df['dataset']==0]
-    w_overlap_log2fc=list()
-    r_overlap_log2fc=list()
-    w_overlap_seq=list()
-    for gene in list(set(w['geneid'])):
-        if gene in list(r75['geneid']):
-            w_gene=w[w['geneid']==gene]
-            r_gene=r75[r75['geneid']==gene]
-            overlap_pos=[pos for pos in list(w_gene['distance_start_codon']) if pos in list(r_gene['distance_start_codon'])]
-            if len(overlap_pos)==0:
-                continue
-            for pos in overlap_pos:
-                w_pos=w_gene[w_gene['distance_start_codon']==pos]
-                r_pos=r_gene[r_gene['distance_start_codon']==pos]
-                w_overlap_log2fc.append(sum(w_pos['log2FC']))
-                r_overlap_log2fc.append(sum(r_pos['scaled_log2FC']))
-                w_overlap_seq.append(list(w_pos['sequence'])[0])
-    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(w_overlap_log2fc,r_overlap_log2fc) 
-    logging_file.write("Number of guides in Wang: %s \n" % w.shape[0]) 
-    logging_file.write("Number of overlapping guides between Wang and Rousset/Cui: %s \n" % len(w_overlap_log2fc))  
-    logging_file.write("Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: %s , %s \n" % (round(slope,6),round(intercept,6)))      
+    # import scipy
+    # print(time.asctime(),'Preprocessing...')
+    # r75=df[df['dataset']==0]
+    # c18=df[df['dataset']==1]
+    # r75.index=r75['sequence']
+    # r75=r75.loc[c18['sequence']]
+    # c18.index=c18['sequence']
+    # scaled_log2FC_rc=dict()
+    # for i in r75.index:
+    #     scaled_log2FC_rc[i]=np.mean([r75['log2FC'][i],c18['log2FC'][i]])
+    # for i in df.index:
+    #     if df['dataset'][i] in [0,1]:
+    #         df.at[i,'scaled_log2FC']=scaled_log2FC_rc[df['sequence'][i]]
+    # logging_file.write("Number of guides in E75 Rousset/E18 Cui: %s \n" % r75.shape[0])        
+    # w=df[df['dataset']==2]
+    # r75=df[df['dataset']==0]
+    # w_overlap_log2fc=list()
+    # r_overlap_log2fc=list()
+    # w_overlap_seq=list()
+    # for gene in list(set(w['geneid'])):
+    #     if gene in list(r75['geneid']):
+    #         w_gene=w[w['geneid']==gene]
+    #         r_gene=r75[r75['geneid']==gene]
+    #         overlap_pos=[pos for pos in list(w_gene['distance_start_codon']) if pos in list(r_gene['distance_start_codon'])]
+    #         if len(overlap_pos)==0:
+    #             continue
+    #         for pos in overlap_pos:
+    #             w_pos=w_gene[w_gene['distance_start_codon']==pos]
+    #             r_pos=r_gene[r_gene['distance_start_codon']==pos]
+    #             w_overlap_log2fc.append(sum(w_pos['log2FC']))
+    #             r_overlap_log2fc.append(sum(r_pos['scaled_log2FC']))
+    #             w_overlap_seq.append(list(w_pos['sequence'])[0])
+    # slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(w_overlap_log2fc,r_overlap_log2fc) 
+    # logging_file.write("Number of guides in Wang: %s \n" % w.shape[0]) 
+    # logging_file.write("Number of overlapping guides between Wang and Rousset/Cui: %s \n" % len(w_overlap_log2fc))  
+    # logging_file.write("Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: %s , %s \n" % (round(slope,6),round(intercept,6)))      
     
-    slope=round(slope,6)
-    intercept=round(intercept,6)
+    # slope=round(slope,6)
+    # intercept=round(intercept,6)
     
-    plt.scatter(w_overlap_log2fc,r_overlap_log2fc,color='skyblue',edgecolors='white')
-    plt.plot(w_overlap_log2fc,np.array(w_overlap_log2fc)*slope+intercept,color='red')
-    plt.xlabel("logFC in Wang")
-    plt.ylabel("average logFC of E75 Rousset and E18 Cui")
-    plt.title("N = "+str(len(w_overlap_log2fc)))
-    plt.savefig(output_file_name+'/regress_wang.svg',dpi=150)
-    plt.close()
+    # plt.scatter(w_overlap_log2fc,r_overlap_log2fc,color='skyblue',edgecolors='white')
+    # plt.plot(w_overlap_log2fc,np.array(w_overlap_log2fc)*slope+intercept,color='red')
+    # plt.xlabel("logFC in Wang")
+    # plt.ylabel("average logFC of E75 Rousset and E18 Cui")
+    # plt.title("N = "+str(len(w_overlap_log2fc)))
+    # plt.savefig(output_file_name+'/regress_wang.svg',dpi=150)
+    # plt.close()
         
-    for i in df.index:
-        if df['dataset'][i] in [0,1]:
-            if df['dataset'][i]==0:
-                df.at[i,'training']=1
-            else:
-                df.at[i,'training']=0
-        else:
-            df.at[i,'scaled_log2FC']=df['log2FC'][i]*slope+intercept
-            if df['sequence'][i] not in w_overlap_seq:
-                df.at[i,'training']=1
-            else:
-                df.at[i,'training']=0
+    # for i in df.index:
+    #     if df['dataset'][i] in [0,1]:
+    #         if df['dataset'][i]==0:
+    #             df.at[i,'training']=1
+    #         else:
+    #             df.at[i,'training']=0
+    #     else:
+    #         df.at[i,'scaled_log2FC']=df['log2FC'][i]*slope+intercept
+    #         if df['sequence'][i] not in w_overlap_seq:
+    #             df.at[i,'training']=1
+    #         else:
+    #             df.at[i,'training']=0
     
-    for i in range(3):
-        sns.distplot(df[df['dataset']==i]['activity_score'],label=dataset_labels[i],hist=False)
-    plt.legend()
-    plt.xlabel("Activity scores (before scaling)")
-    plt.savefig(output_file_name+"/activity_score_before.svg", dpi=150)
-    plt.close()
+    # for i in range(3):
+    #     sns.distplot(df[df['dataset']==i]['activity_score'],label=dataset_labels[i],hist=False)
+    # plt.legend()
+    # plt.xlabel("Activity scores (before scaling)")
+    # plt.savefig(output_file_name+"/activity_score_before.svg", dpi=150)
+    # plt.close()
 
-    #calculate the activity scores for each gene in 3 datasets based on scaled logFC
-    for i in list(set(df['geneid'])):
-        gene_df=df[df['geneid']==i]
-        median=statistics.median(gene_df['scaled_log2FC'])
-        for j in gene_df.index:
-            df.at[j,'median']=median
-            df.at[j,'activity_score']=median-df['scaled_log2FC'][j]
+    # #calculate the activity scores for each gene in 3 datasets based on scaled logFC
+    # for i in list(set(df['geneid'])):
+    #     gene_df=df[df['geneid']==i]
+    #     median=statistics.median(gene_df['scaled_log2FC'])
+    #     for j in gene_df.index:
+    #         df.at[j,'median']=median
+    #         df.at[j,'activity_score']=median-df['scaled_log2FC'][j]
     
-    for i in range(3):
-        sns.distplot(df[df['dataset']==i]['scaled_log2FC'],label=dataset_labels[i],hist=False)
-    plt.legend()
-    plt.xlabel("Scaled logFC")
-    plt.savefig(output_file_name+"/scaled_log2fc.png", dpi=150)
-    plt.close()
+    # for i in range(3):
+    #     sns.distplot(df[df['dataset']==i]['scaled_log2FC'],label=dataset_labels[i],hist=False)
+    # plt.legend()
+    # plt.xlabel("Scaled logFC")
+    # plt.savefig(output_file_name+"/scaled_log2fc.png", dpi=150)
+    # plt.close()
     
-    for i in range(3):
-        sns.distplot(df[df['dataset']==i]['activity_score'],label=dataset_labels[i],hist=False)
-    plt.legend()
-    plt.xlabel("Activity scores (after scaling)")
-    plt.savefig(output_file_name+"/activity_score_after.svg", dpi=150)
-    plt.close()
+    # for i in range(3):
+    #     sns.distplot(df[df['dataset']==i]['activity_score'],label=dataset_labels[i],hist=False)
+    # plt.legend()
+    # plt.xlabel("Activity scores (after scaling)")
+    # plt.savefig(output_file_name+"/activity_score_after.svg", dpi=150)
+    # plt.close()
     
-    training_tag=list(df['training'])
-    scaled_log2FC=np.array(df['scaled_log2FC'],dtype=float)
-    print(time.asctime(),'Done preprocessing...')
-    
+    # training_tag=list(df['training'])
+    # scaled_log2FC=np.array(df['scaled_log2FC'],dtype=float)
+    # print(time.asctime(),'Done preprocessing...')
+    geneids=list(df['geneid'])
+    sequences=list(df['sequence'])
     log2FC=np.array(df['log2FC'],dtype=float)
     #define guideid based on chosen split method
     guideids=np.array(list(df['geneid']))
@@ -265,7 +266,7 @@ def DataFrame_input(df):
     logging_file.write("Number of features: %s\n" % len(headers))
     logging_file.write('Features: %s\n'%",".join(headers))
     X=pandas.DataFrame(data=X,columns=headers)
-    return X, y, headers,dataset_col,log2FC,median, guideids,scaled_log2FC ,training_tag
+    return X, y, headers,dataset_col,log2FC,median, guideids ,sequences,geneids
 
 
 def Evaluation(output_file_name,y,predictions,kmeans,kmeans_train,name):
@@ -310,7 +311,75 @@ def SHAP(estimator,X,headers):
         plt.xticks(fontsize='small')
         plt.savefig(output_file_name+"/shap_value_top%s.svg"%(i),dpi=400)
         plt.close()    
-
+def datafusion_scaling(df):
+    import scipy,statistics
+    logging_file= open(output_file_name + '/log.txt','a')
+    print(time.asctime(),'Preprocessing...')
+    r75=df[df['dataset']==0]
+    c18=df[df['dataset']==1]
+    r75.index=r75['sequence']
+    r75=r75.loc[c18['sequence']] #align the gRNAs in two datasets
+    c18.index=c18['sequence']
+    scaled_log2FC_rc=dict()
+    for i in r75.index:
+        scaled_log2FC_rc[i]=np.mean([r75['log2FC'][i],c18['log2FC'][i]]) # calculate the mean logFC as sacled logFC
+    for i in df.index:
+        if df['dataset'][i] in [0,1]:
+            df.at[i,'scaled_log2FC']=scaled_log2FC_rc[df['sequence'][i]]
+    logging_file.write("Number of guides in E75 Rousset/E18 Cui: %s \n" % r75.shape[0])        
+    w=df[df['dataset']==2]
+    r75=df[df['dataset']==0]
+    w_overlap_log2fc=list()
+    r_overlap_log2fc=list()
+    w_overlap_seq=list()
+    for gene in list(set(w['geneid'])):
+        if gene in list(r75['geneid']):
+            w_gene=w[w['geneid']==gene]
+            r_gene=r75[r75['geneid']==gene]
+            overlap_pos=[pos for pos in list(w_gene['distance_start_codon']) if pos in list(r_gene['distance_start_codon'])] #record overlapping gRNAs in each gene
+            if len(overlap_pos)==0:
+                continue
+            for pos in overlap_pos:
+                w_pos=w_gene[w_gene['distance_start_codon']==pos]
+                r_pos=r_gene[r_gene['distance_start_codon']==pos]
+                w_overlap_log2fc.append(sum(w_pos['log2FC'])) #the logFC of overlapping gRNA in Wang
+                r_overlap_log2fc.append(sum(r_pos['scaled_log2FC'])) #the scaled logFC of overlapping gRNA in Rousset
+                w_overlap_seq.append(list(w_pos['sequence'])[0]) #record overlapping gRNAs in Wang to exclude them
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(w_overlap_log2fc,r_overlap_log2fc) # fit linear regression
+    logging_file.write("Number of guides in Wang: %s \n" % w.shape[0]) 
+    logging_file.write("Number of overlapping guides between Wang and Rousset/Cui: %s \n" % len(w_overlap_log2fc))  
+    logging_file.write("Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: %s , %s \n" % (round(slope,6),round(intercept,6)))      
+    
+    slope=round(slope,6)
+    intercept=round(intercept,6)
+    
+    plt.scatter(w_overlap_log2fc,r_overlap_log2fc,color='skyblue',edgecolors='white')
+    plt.plot(w_overlap_log2fc,np.array(w_overlap_log2fc)*slope+intercept,color='red')
+    plt.xlabel("logFC in Wang")
+    plt.ylabel("average logFC of E75 Rousset and E18 Cui")
+    plt.title("N = "+str(len(w_overlap_log2fc)))
+    plt.savefig(output_file_name+'/regress_wang.svg',dpi=150)
+    plt.close()    
+    
+    for i in df.index:
+        if df['dataset'][i] in [0,1]:
+            if df['dataset'][i]==0:
+                df.at[i,'training']=1
+            else:
+                df.at[i,'training']=0
+        else:
+            df.at[i,'scaled_log2FC']=df['log2FC'][i]*slope+intercept
+            if df['sequence'][i] not in w_overlap_seq:
+                df.at[i,'training']=1
+            else:
+                df.at[i,'training']=0
+    for i in list(set(df['geneid'])):
+        gene_df=df[df['geneid']==i]
+        median=statistics.median(gene_df['scaled_log2FC'])
+        for j in gene_df.index:
+            df.at[j,'median']=median
+            df.at[j,'activity']=median-df['scaled_log2FC'][j]
+    return df
 def main():
     seed_everything(111,workers=True)
     open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
@@ -332,7 +401,7 @@ def main():
     training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
     #dropping unnecessary features and encode sequence features
-    X,y,headers,dataset_col,log2FC,median,guideids ,scaled_log2FC ,training_tag= DataFrame_input(training_df)
+    X,y,headers,dataset_col,log2FC,median,guideids ,sequences,geneids= DataFrame_input(training_df)
     open(output_file_name + '/log.txt','a').write("Data input Time: %s seconds\n\n" %('{:.2f}'.format(time.time()-start_time)))  
     
     header=[i for i in headers if i !='sequence_30nt']
@@ -343,11 +412,10 @@ def main():
     patience = 5
     print(time.asctime(),'Start 10-fold CV...')
     #k-fold cross validation
-    evaluations=defaultdict(list)
     iteration_predictions=defaultdict(list)
     kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
-    X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,scaled_log2FC,median,guideids,dataset_col,training_tag],
-                              columns=headers+['activity','log2FC','scaled_log2FC','median','guideid','dataset_col','training_tag'])
+    X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,median,guideids,dataset_col,sequences,geneids],
+                              columns=headers+['activity','log2FC','median','guideid','dataset','sequence','geneid'])
     fold_inner=0
     guideid_set=list(set(guideids))
     for train_index, test_index in kf.split(guideid_set):
@@ -356,17 +424,23 @@ def main():
         test = X_df[X_df['guideid'].isin(test_index)]
         y_test=test['activity']
         log2FC_test = np.array( test['log2FC'])
-        scaled_log2FC_test=np.array(test['scaled_log2FC'])
-        median_test =np.array( test['median'])
+        # scaled_log2FC_test=np.array(test['scaled_log2FC'])
+        # median_test =np.array( test['median'])
         X_test=test[headers]
         # train val split
         index_train, index_val = sklearn.model_selection.train_test_split(train_index, test_size=test_size,random_state=np.random.seed(111))
-        X_train = X_df[X_df['guideid'].isin(index_train)]
-        X_train=X_train[X_train['training_tag']==1] #remove duplicate guides
-        X_train=X_train[X_train['dataset_col'].isin(training_sets)]
-        X_val = X_df[X_df['guideid'].isin(index_val)]
-        X_val=X_val[X_val['training_tag']==1]
-        X_val=X_val[X_val['dataset_col'].isin(training_sets)]
+        X_train = X_df[X_df['guideid'].isin(train_index)]
+        
+        X_train=X_train[X_train['dataset'].isin(training_sets)]
+        if len(training_sets)>1:
+            X_train = datafusion_scaling(X_train)
+        else:
+            X_train['training']=[1]*X_train.shape[0]
+        X_val = X_train[X_train['guideid'].isin(index_val)]
+        X_train = X_train[X_train['guideid'].isin(index_train)]
+        X_train=X_train[X_train['training']==1] #remove duplicate guides
+        X_val=X_val[X_val['training']==1]
+        X_val=X_val[X_val['dataset'].isin(training_sets)]
         y_train=X_train['activity']
         X_train=X_train[headers]
         y_val=X_val['activity']
@@ -423,51 +497,43 @@ def main():
                                     dataloaders=loader_test,
                                     return_predictions=True,
                                     ckpt_path=filename_model)
-        #print(len(predictions_test))
         predictions = predictions_test[0].cpu().numpy().flatten()
         fold_inner+=1
         iteration_predictions['log2FC'].append(list(log2FC_test))
         iteration_predictions['pred'].append(list(predictions))
         iteration_predictions['iteration'].append([fold_inner]*len(y_test))
-        iteration_predictions['dataset'].append(list(test['dataset_col']))
+        iteration_predictions['dataset'].append(list(test['dataset']))
         iteration_predictions['geneid'].append(list(test['guideid']))
 
-        evaluations['Rs_activity'].append(spearmanr(y_test, predictions)[0])
-        evaluations['Rs_depletion'].append(spearmanr(scaled_log2FC_test, median_test-predictions)[0])
-        if len(datasets)>1:
-            for dataset in range(len(datasets)):
-                dataset1=test[test['dataset_col']==dataset]
-                X_test_1=dataset1[headers]
-                X_test_1[header] = SCALE.transform(X_test_1[header])
-                y_test_1=dataset1['activity']
-                log2FC_test_1=np.array(dataset1['log2FC'],dtype=float)
-                scaled_log2FC_test_1=np.array(dataset1['scaled_log2FC'])
-                median_test_1=np.array(dataset1['median'],dtype=float)
-                
-                loader_test = CrisprDatasetTrain(X_test_1, y_test_1, header)
-                loader_test = DataLoader(loader_test, batch_size=X_test_1.shape[0], shuffle = False)
-                predictions_test = estimator.predict(
-                model=trained_model,
-                dataloaders=loader_test,
-                return_predictions=True,
-                ckpt_path=filename_model)
-                #print(len(predictions_test))
-                predictions = predictions_test[0].cpu().numpy().flatten()
-                spearman_rho,_=spearmanr(y_test_1, predictions)
-                evaluations['Rs_activity_test%s'%(dataset+1)].append(spearman_rho)
-                evaluations['Rs_depletion_test%s'%(dataset+1)].append(spearmanr(scaled_log2FC_test_1, median_test_1-predictions)[0])
             
 
-    evaluations=pandas.DataFrame.from_dict(evaluations)
-    evaluations.to_csv(output_file_name+'/iteration_scores.csv',sep='\t',index=True)
     iteration_predictions=pandas.DataFrame.from_dict(iteration_predictions)
     iteration_predictions.to_csv(output_file_name+'/iteration_predictions.csv',sep='\t',index=False)
     print(time.asctime(),'Start saving model...')
     index_train, index_val = sklearn.model_selection.train_test_split(guideid_set, test_size=0.2,random_state=np.random.seed(111))
-    X_train = X_df[X_df['guideid'].isin(index_train)]
-    X_train=X_train[X_train['dataset_col'].isin(training_sets)]
-    X_val = X_df[X_df['guideid'].isin(index_val)]
-    X_val=X_val[X_val['dataset_col'].isin(training_sets)]
+    
+    X_train=X_df[X_df['dataset'].isin(training_sets)]
+    if len(training_sets)>1:
+        for i in range(3):
+            sns.distplot(X_train[X_train['dataset']==i]['activity'],label=dataset_labels[i],hist=False)
+        plt.legend()
+        plt.xlabel("Activity scores (before scaling)")
+        plt.savefig(output_file_name+"/activity_score_before.svg", dpi=150)
+        plt.close()
+        X_train = datafusion_scaling(X_train)
+        for i in range(3):
+            sns.distplot(X_train[X_train['dataset']==i]['activity'],label=dataset_labels[i],hist=False)
+        plt.legend()
+        plt.xlabel("Activity scores (before scaling)")
+        plt.savefig(output_file_name+"/activity_score_after.svg", dpi=150)
+        plt.close()
+    else:
+        X_train['training']=[1]*X_train.shape[0]
+    X_val = X_train[X_train['guideid'].isin(index_val)]
+    X_train = X_train[X_train['guideid'].isin(index_train)]
+    X_train=X_train[X_train['training']==1] #remove duplicate guides
+    X_val=X_val[X_val['dataset'].isin(training_sets)]
+    X_val=X_val[X_val['training']==1]
     y_train=X_train['activity']
     X_train=X_train[headers]
     y_val=X_val['activity']

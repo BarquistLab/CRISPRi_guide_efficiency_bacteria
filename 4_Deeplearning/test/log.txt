@@ -7,27 +7,67 @@ Total number of guides in dataset ../0_Datasets/Wang_dataset.csv: 52104
 Training dataset: all 3 datasets
 Number of guides for essential genes: 8099 
 Number of guides after filtering: 7400 
+Number of features: 9
+Features: sequence_30nt,guide_GC_content,distance_start_codon,distance_start_codon_perc,homopolymers,MFE_hybrid_full,MFE_hybrid_seed,MFE_homodimer_guide,MFE_monomer_guide
+Data input Time: 2.80 seconds
+
+Number of guides in E75 Rousset/E18 Cui: 1464 
+Number of guides in Wang: 3746 
+Number of overlapping guides between Wang and Rousset/Cui: 342 
+Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.737795 , -1.103703 
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f40e7dc0850>
+Number of guides in E75 Rousset/E18 Cui: 1498 
+Number of guides in Wang: 3761 
+Number of overlapping guides between Wang and Rousset/Cui: 345 
+Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.737526 , -1.219662 
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f40e63f9ca0>
+Number of guides in E75 Rousset/E18 Cui: 1452 
+Number of guides in Wang: 3740 
+Number of overlapping guides between Wang and Rousset/Cui: 335 
+Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.729434 , -1.259026 
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f40e6427550>
+Number of guides in E75 Rousset/E18 Cui: 1454 
+Number of guides in Wang: 3742 
+Number of overlapping guides between Wang and Rousset/Cui: 339 
+Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.733368 , -1.230771 
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f40e7cc1cd0>
+Number of guides in E75 Rousset/E18 Cui: 1505 
+Number of guides in Wang: 3766 
+Number of overlapping guides between Wang and Rousset/Cui: 346 
+Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.738755 , -1.217332 
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f40dd4f4940>
+Number of guides in E75 Rousset/E18 Cui: 1422 
+Number of guides in Wang: 3750 
+Number of overlapping guides between Wang and Rousset/Cui: 334 
+Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.745859 , -1.151791 
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f40dd2a2640>
+Number of guides in E75 Rousset/E18 Cui: 1428 
+Number of guides in Wang: 3745 
+Number of overlapping guides between Wang and Rousset/Cui: 340 
+Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.717187 , -1.224669 
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f40dcfce460>
+Number of guides in E75 Rousset/E18 Cui: 1449 
+Number of guides in Wang: 3740 
+Number of overlapping guides between Wang and Rousset/Cui: 342 
+Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.73564 , -1.097215 
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f40dcdc7880>
+Number of guides in E75 Rousset/E18 Cui: 1452 
+Number of guides in Wang: 3736 
+Number of overlapping guides between Wang and Rousset/Cui: 341 
+Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.715071 , -1.296461 
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f40dcb3d4c0>
+Number of guides in E75 Rousset/E18 Cui: 1438 
+Number of guides in Wang: 3750 
+Number of overlapping guides between Wang and Rousset/Cui: 338 
+Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.737349 , -1.19884 
+Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f40dc9b03d0>
 Number of guides in E75 Rousset/E18 Cui: 1618 
 Number of guides in Wang: 4164 
 Number of overlapping guides between Wang and Rousset/Cui: 378 
 Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: 0.732782 , -1.199772 
-Number of features: 9
-Features: sequence_30nt,guide_GC_content,distance_start_codon,distance_start_codon_perc,homopolymers,MFE_hybrid_full,MFE_hybrid_seed,MFE_homodimer_guide,MFE_monomer_guide
-Data input Time: 4.76 seconds
-
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f4b9d5d73a0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f4b9d57c4f0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f4b9d63f550>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f4b9d71b280>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f4b9d76fb20>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f4b9d77c130>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f4b9d9cc5e0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f4b9fb48820>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f4b9d7625b0>
-Estimator:<pytorch_lightning.trainer.trainer.Trainer object at 0x7f4b8a2c57f0>
 Median Spearman correlation for all gRNAs of each gene: 
-E75 Rousset (median/mean): 0.32499999999999996 / 0.31271707350799954 
-E18 Cui (median/mean): 0.37499999999999994 / 0.307115866118589 
-Wang (median/mean): 0.296565934065934 / 0.26882651232819765 
-Mixed 3 datasets (median/mean): 0.3214285714285715 / 0.26882651232819765 
-Execution Time: 239.79 seconds
+E75 Rousset (median/mean): 0.3276923076923077 / 0.2980799094323382 
+E18 Cui (median/mean): 0.33636363636363636 / 0.2984184430351419 
+Wang (median/mean): 0.3214285714285714 / 0.2757605896255183 
+Mixed 3 datasets (median/mean): 0.32613636363636367 / 0.2757605896255183 
+Execution Time: 232.36 seconds

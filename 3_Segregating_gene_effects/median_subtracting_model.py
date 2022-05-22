@@ -137,112 +137,22 @@ def DataFrame_input(df):
     #keep only genes with more than 5 guides from each dataset
     df=df[df['Nr_guide']>=5]
     logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
-    
-    import scipy
-    print(time.asctime(),'Preprocessing...')
-    r75=df[df['dataset']==0]
-    c18=df[df['dataset']==1]
-    r75.index=r75['sequence']
-    r75=r75.loc[c18['sequence']] #align the gRNAs in two datasets
-    c18.index=c18['sequence']
-    scaled_log2FC_rc=dict()
-    for i in r75.index:
-        scaled_log2FC_rc[i]=np.mean([r75['log2FC'][i],c18['log2FC'][i]]) # calculate the mean logFC as sacled logFC
-    for i in df.index:
-        if df['dataset'][i] in [0,1]:
-            df.at[i,'scaled_log2FC']=scaled_log2FC_rc[df['sequence'][i]]
-    logging_file.write("Number of guides in E75 Rousset/E18 Cui: %s \n" % r75.shape[0])        
-    w=df[df['dataset']==2]
-    r75=df[df['dataset']==0]
-    w_overlap_log2fc=list()
-    r_overlap_log2fc=list()
-    w_overlap_seq=list()
-    for gene in list(set(w['geneid'])):
-        if gene in list(r75['geneid']):
-            w_gene=w[w['geneid']==gene]
-            r_gene=r75[r75['geneid']==gene]
-            overlap_pos=[pos for pos in list(w_gene['distance_start_codon']) if pos in list(r_gene['distance_start_codon'])] #record overlapping gRNAs in each gene
-            if len(overlap_pos)==0:
-                continue
-            for pos in overlap_pos:
-                w_pos=w_gene[w_gene['distance_start_codon']==pos]
-                r_pos=r_gene[r_gene['distance_start_codon']==pos]
-                w_overlap_log2fc.append(sum(w_pos['log2FC'])) #the logFC of overlapping gRNA in Wang
-                r_overlap_log2fc.append(sum(r_pos['scaled_log2FC'])) #the scaled logFC of overlapping gRNA in Rousset
-                w_overlap_seq.append(list(w_pos['sequence'])[0]) #record overlapping gRNAs in Wang to exclude them
-    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(w_overlap_log2fc,r_overlap_log2fc) # fit linear regression
-    logging_file.write("Number of guides in Wang: %s \n" % w.shape[0]) 
-    logging_file.write("Number of overlapping guides between Wang and Rousset/Cui: %s \n" % len(w_overlap_log2fc))  
-    logging_file.write("Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: %s , %s \n" % (round(slope,6),round(intercept,6)))      
-    
-    slope=round(slope,6)
-    intercept=round(intercept,6)
-    
-    plt.scatter(w_overlap_log2fc,r_overlap_log2fc,color='skyblue',edgecolors='white')
-    plt.plot(w_overlap_log2fc,np.array(w_overlap_log2fc)*slope+intercept,color='red')
-    plt.xlabel("logFC in Wang")
-    plt.ylabel("average logFC of E75 Rousset and E18 Cui")
-    plt.title("N = "+str(len(w_overlap_log2fc)))
-    plt.savefig(output_file_name+'/regress_wang.svg',dpi=150)
-    plt.close()
-        
-    for i in df.index:
-        if df['dataset'][i] in [0,1]:
-            if df['dataset'][i]==0:
-                df.at[i,'training']=1
-            else:
-                df.at[i,'training']=0
-        else:
-            df.at[i,'scaled_log2FC']=df['log2FC'][i]*slope+intercept
-            if df['sequence'][i] not in w_overlap_seq:
-                df.at[i,'training']=1
-            else:
-                df.at[i,'training']=0
-    
-    for i in range(3):
-        sns.distplot(df[df['dataset']==i]['activity_score'],label=dataset_labels[i],hist=False)
-    plt.legend()
-    plt.xlabel("Activity scores (before scaling)")
-    plt.savefig(output_file_name+"/activity_score_before.svg", dpi=150)
-    plt.close()
-    #calculate the activity scores for each gene in 3 datasets based on scaled logFC
-    for i in list(set(df['geneid'])):
-        gene_df=df[df['geneid']==i]
-        median=statistics.median(gene_df['scaled_log2FC'])
-        for j in gene_df.index:
-            df.at[j,'median']=median
-            df.at[j,'activity_score']=median-df['scaled_log2FC'][j]
-    
-    for i in range(3):
-        sns.distplot(df[df['dataset']==i]['scaled_log2FC'],label=dataset_labels[i],hist=False)
-    plt.legend()
-    plt.xlabel("Scaled logFC")
-    plt.savefig(output_file_name+"/scaled_log2fc.png", dpi=150)
-    plt.close()
-    
-    for i in range(3):
-        sns.distplot(df[df['dataset']==i]['activity_score'],label=dataset_labels[i],hist=False)
-    plt.legend()
-    plt.xlabel("Activity scores (after scaling)")
-    plt.savefig(output_file_name+"/activity_score_after.svg", dpi=150)
-    plt.close()
-    
-    training_tag=list(df['training'])
-    scaled_log2FC=np.array(df['scaled_log2FC'],dtype=float)
-    print(time.asctime(),'Done preprocessing...')
+
     log2FC=np.array(df['log2FC'],dtype=float)
+    geneids=list(df['geneid'])
+    distance_start_codons=list(df['distance_start_codon'])
     ### one hot encoded sequence features
     PAM_encoded=[]
     sequence_encoded=[]
     dinucleotide_encoded=[]
-    guide_sequence_set=list(dict.fromkeys(df['sequence']))
+    # guide_sequence_set=list(dict.fromkeys(df['sequence']))
     for i in df.index:
         df.at[i,'geneid']=int(df['geneid'][i][1:])
         # df.at[i,'guideid']=guide_sequence_set.index(df['sequence'][i])
         PAM_encoded.append(self_encode(df['PAM'][i]))
         sequence_encoded.append(self_encode(df['sequence'][i]))
         dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
-    
+    sequences=list(df['sequence'])
     #define guideid
     guideids=np.array(list(df['geneid']))
     # remove columns that are not used in training
@@ -288,7 +198,7 @@ def DataFrame_input(df):
     logging_file.write('Number of features: %s\n'%len(headers))
     logging_file.write('Features: %s\n'%",".join(headers))
     
-    return X, y, headers,dataset_col,log2FC,median , guideids,guide_sequence_set,scaled_log2FC,training_tag
+    return X, y, headers,dataset_col,log2FC,median , guideids,sequences,geneids,distance_start_codons
 
 
 def Evaluation(output_file_name,y,predictions,name):
@@ -384,7 +294,75 @@ def convert_float_params(names, params):
     return params
 def scorer(reg,X,y):
     return(-1*spearmanr(reg.predict(X),y)[0])
-
+def datafusion_scaling(df):
+    import scipy,statistics
+    logging_file= open(output_file_name + '/log.txt','a')
+    print(time.asctime(),'Preprocessing...')
+    r75=df[df['dataset']==0]
+    c18=df[df['dataset']==1]
+    r75.index=r75['sequence']
+    r75=r75.loc[c18['sequence']] #align the gRNAs in two datasets
+    c18.index=c18['sequence']
+    scaled_log2FC_rc=dict()
+    for i in r75.index:
+        scaled_log2FC_rc[i]=np.mean([r75['log2FC'][i],c18['log2FC'][i]]) # calculate the mean logFC as sacled logFC
+    for i in df.index:
+        if df['dataset'][i] in [0,1]:
+            df.at[i,'scaled_log2FC']=scaled_log2FC_rc[df['sequence'][i]]
+    logging_file.write("Number of guides in E75 Rousset/E18 Cui: %s \n" % r75.shape[0])        
+    w=df[df['dataset']==2]
+    r75=df[df['dataset']==0]
+    w_overlap_log2fc=list()
+    r_overlap_log2fc=list()
+    w_overlap_seq=list()
+    for gene in list(set(w['geneid'])):
+        if gene in list(r75['geneid']):
+            w_gene=w[w['geneid']==gene]
+            r_gene=r75[r75['geneid']==gene]
+            overlap_pos=[pos for pos in list(w_gene['distance_start_codon']) if pos in list(r_gene['distance_start_codon'])] #record overlapping gRNAs in each gene
+            if len(overlap_pos)==0:
+                continue
+            for pos in overlap_pos:
+                w_pos=w_gene[w_gene['distance_start_codon']==pos]
+                r_pos=r_gene[r_gene['distance_start_codon']==pos]
+                w_overlap_log2fc.append(sum(w_pos['log2FC'])) #the logFC of overlapping gRNA in Wang
+                r_overlap_log2fc.append(sum(r_pos['scaled_log2FC'])) #the scaled logFC of overlapping gRNA in Rousset
+                w_overlap_seq.append(list(w_pos['sequence'])[0]) #record overlapping gRNAs in Wang to exclude them
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(w_overlap_log2fc,r_overlap_log2fc) # fit linear regression
+    logging_file.write("Number of guides in Wang: %s \n" % w.shape[0]) 
+    logging_file.write("Number of overlapping guides between Wang and Rousset/Cui: %s \n" % len(w_overlap_log2fc))  
+    logging_file.write("Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: %s , %s \n" % (round(slope,6),round(intercept,6)))      
+    
+    slope=round(slope,6)
+    intercept=round(intercept,6)
+    
+    plt.scatter(w_overlap_log2fc,r_overlap_log2fc,color='skyblue',edgecolors='white')
+    plt.plot(w_overlap_log2fc,np.array(w_overlap_log2fc)*slope+intercept,color='red')
+    plt.xlabel("logFC in Wang")
+    plt.ylabel("average logFC of E75 Rousset and E18 Cui")
+    plt.title("N = "+str(len(w_overlap_log2fc)))
+    plt.savefig(output_file_name+'/regress_wang.svg',dpi=150)
+    plt.close()
+        
+    for i in df.index:
+        if df['dataset'][i] in [0,1]:
+            if df['dataset'][i]==0:
+                df.at[i,'training']=1
+            else:
+                df.at[i,'training']=0
+        else:
+            df.at[i,'scaled_log2FC']=df['log2FC'][i]*slope+intercept
+            if df['sequence'][i] not in w_overlap_seq:
+                df.at[i,'training']=1
+            else:
+                df.at[i,'training']=0
+    for i in list(set(df['geneid'])):
+        gene_df=df[df['geneid']==i]
+        median=statistics.median(gene_df['scaled_log2FC'])
+        for j in gene_df.index:
+            df.at[j,'median']=median
+            df.at[j,'activity']=median-df['scaled_log2FC'][j]
+    return df
 def main():
     open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
     open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)
@@ -405,13 +383,15 @@ def main():
     training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
     #dropping unnecessary features and encode sequence features
-    X,y,headers,dataset_col,log2FC,median,guideids, guide_sequence_set ,scaled_log2FC ,training_tag= DataFrame_input(training_df)
+    X,y,headers,dataset_col,log2FC,median,guideids, sequences,geneids,distance_start_codons= DataFrame_input(training_df)
     open(output_file_name + '/log.txt','a').write("Data input Time: %s seconds\n\n" %('{:.2f}'.format(time.time()-start_time)))  
-    X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,scaled_log2FC,median,guideids,dataset_col,training_tag],
-                              columns=headers+['activity','log2FC','scaled_log2FC','median','guideid','dataset_col','training_tag'])
+    X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,median,guideids,dataset_col,sequences,geneids],
+                              columns=headers+['activity','log2FC','median','guideid','dataset','sequence','geneid'])
+    if split=='gene_dropdistance':
+        X_df=pandas.DataFrame(data=np.c_[X_df,distance_start_codons],columns=X_df.columns.values.tolist()+['distance_start_codon'])
     dtypes=dict()
     for feature in X_df.columns.values:
-        if feature != 'geneid':
+        if feature != 'geneid' and feature !='sequence':
             dtypes.update({feature:float})
     X_df=X_df.astype(dtypes)
     guideid_set=list(set(guideids)) #use the previous split sets for comparison
@@ -425,8 +405,12 @@ def main():
                         min_weight_fraction_leaf=0.0, n_estimators=512, n_jobs=1,
                         verbose=0, warm_start=False,random_state = np.random.seed(111))
     if choice=='lasso':
-        X_hyperopt=X_df[X_df['dataset_col'].isin(training_sets)]
-        X_hyperopt=X_hyperopt[X_hyperopt['training_tag']==1]
+        X_hyperopt=X_df[X_df['dataset'].isin(training_sets)]
+        if len(training_sets)>1:
+            X_hyperopt = datafusion_scaling(X_hyperopt)
+        else:
+            X_hyperopt['training']=[1]*X_hyperopt.shape[0]
+        X_hyperopt=X_hyperopt[X_hyperopt['training']==1]
         y_hyperopt=X_hyperopt['activity']
         guideids_hyperopt=X_hyperopt['guideid']
         X_hyperopt=X_hyperopt[headers]
@@ -487,7 +471,6 @@ def main():
                 pasteur_test.at[j,'guideid']=int(pasteur_test['geneid'][j][1:])
                 pasteur_test.at[j,'activity_score']=statistics.median(gene_df['log2FC'])-pasteur_test['log2FC'][j]
     #k-fold cross validation
-    evaluations=defaultdict(list)
     iteration_predictions=defaultdict(list)
     kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
     print(time.asctime(),'Start 10-fold CV...')
@@ -496,15 +479,22 @@ def main():
         train_index = np.array(guideid_set)[train_index]
         test_index = np.array(guideid_set)[test_index]
         train = X_df[X_df['guideid'].isin(train_index)]
-        train=train[train['training_tag']==1] #only used
-        X_train=train[train['dataset_col'].isin(training_sets)]
+        train=train[train['dataset'].isin(training_sets)]
+        
+        if len(training_sets)>1:
+            train = datafusion_scaling(train)
+        else:
+            train['training']=[1]*train.shape[0]
+            
+        X_train=train[train['training']==1] #only used
+        
         y_train=np.array(X_train['activity'])
         X_train=np.array(X_train[headers])
         test = X_df[X_df['guideid'].isin(test_index)]
         y_test=np.array(test['activity'])
         log2FC_test = np.array( test['log2FC'])
-        scaled_log2FC_test=np.array(test['scaled_log2FC'])
-        median_test =np.array( test['median'])
+        # scaled_log2FC_test=np.array(test['scaled_log2FC'])
+        # median_test =np.array( test['median'])
         X_test=np.array(test[headers])
         
         estimator = estimator.fit(X_train,y_train)
@@ -514,25 +504,9 @@ def main():
         iteration_predictions['log2FC'].append(list(log2FC_test))
         iteration_predictions['pred'].append(list(predictions))
         iteration_predictions['iteration'].append([iteration]*len(y_test))
-        iteration_predictions['dataset'].append(list(test['dataset_col']))
+        iteration_predictions['dataset'].append(list(test['dataset']))
         iteration_predictions['geneid'].append(list(test['guideid']))
         
-        evaluations['Rs_activity'].append(spearmanr(y_test, predictions)[0])
-        evaluations['Rs_depletion'].append(spearmanr(scaled_log2FC_test, median_test-predictions)[0])
-        evaluations['Rs_median'].append(spearmanr(scaled_log2FC_test, median_test)[0])
-        for dataset in range(len(datasets)):
-            dataset1=test[test['dataset_col']==dataset]
-            X_test_1=dataset1[headers]
-            y_test_1=np.array(dataset1['activity'],dtype=float)
-            log2FC_test_1=np.array(dataset1['log2FC'],dtype=float)
-            scaled_log2FC_test_1=np.array(dataset1['scaled_log2FC'])
-            median_test_1=np.array(dataset1['median'],dtype=float)
-            
-            predictions=estimator.predict(X_test_1)
-            spearman_rho,_=spearmanr(y_test_1, predictions)
-            evaluations['Rs_activity_test%s'%(dataset+1)].append(spearman_rho)
-            evaluations['Rs_depletion_test%s'%(dataset+1)].append(spearmanr(scaled_log2FC_test_1, median_test_1-predictions)[0])
-            evaluations['Rs_median_test%s'%(dataset+1)].append(spearmanr(scaled_log2FC_test_1, median_test_1)[0])
         
         #Pasteur method test on our test set
         pasteur=pasteur_test[(pasteur_test['guideid'].isin(test_index))]
@@ -544,68 +518,36 @@ def main():
         reg=pickle.load(open('Pasteur_model.pkl','rb'))
         test_data['pasteur_score']=reg.predict(training_seq).reshape(-1, 1).ravel()
         iteration_predictions['pasteur_score'].append(list(reg.predict(training_seq).reshape(-1, 1).ravel()))
-        for i in test_data.index:
-            test_data.at[i,'predicted_score']=test_data['median'][i]-test_data['pasteur_score'][i]
-        evaluations['Rs_depletion_pasteur_data'].append(spearmanr(test_data['log2FC'], test_data['predicted_score'])[0])
-        evaluations['Rs_activity_pasteur_data'].append(spearmanr(test_data['activity_score'], test_data['pasteur_score'])[0])
-        for dataset in range(len(datasets)):
-            test_data=pasteur[pasteur['dataset']==dataset]
-            training_seq,guides_index=find_target(test_data)
-            training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
-            training_seq=training_seq.reshape(training_seq.shape[0],-1)
-            test_data=test_data.loc[guides_index]
-            test_data['pasteur_score']=reg.predict(training_seq).reshape(-1, 1).ravel()
-            
-            for i in test_data.index:
-                test_data.at[i,'predicted_score']=test_data['median'][i]-test_data['pasteur_score'][i]
-            evaluations['Rs_depletion_pasteur_data%s'%(dataset+1)].append(spearmanr(test_data['log2FC'], test_data['predicted_score'])[0])
-            # Evaluation(output_file_name,np.array(test_data['log2FC']),np.array(test_data['predicted_score']),"X_pasteur_test%s"%(dataset+1))
-            evaluations['Rs_activity_pasteur_data%s'%(dataset+1)].append(spearmanr(test_data['activity_score'], test_data['pasteur_score'])[0])
 
-    evaluations=pandas.DataFrame.from_dict(evaluations)
-    evaluations.to_csv(output_file_name+'/iteration_scores.csv',sep='\t',index=True)
     iteration_predictions=pandas.DataFrame.from_dict(iteration_predictions)
     iteration_predictions.to_csv(output_file_name+'/iteration_predictions.csv',sep='\t',index=False)
     print(time.asctime(),'Start saving model...')
     logging_file= open(output_file_name + '/log.txt','a')
     #save models trained with all samples
-    X_all=X_df[X_df['dataset_col'].isin(training_sets)][headers]
-    estimator.fit(np.array(X_all),np.array(X_df[X_df['dataset_col'].isin(training_sets)]['activity']))
+    X_all=X_df[X_df['dataset'].isin(training_sets)]
+    if len(training_sets)>1:
+        for i in range(3):
+            sns.distplot(X_all[X_all['dataset']==i]['activity'],label=dataset_labels[i],hist=False)
+        plt.legend()
+        plt.xlabel("Activity scores (before scaling)")
+        plt.savefig(output_file_name+"/activity_score_before.svg", dpi=150)
+        plt.close()
+        X_all = datafusion_scaling(X_all)
+        for i in range(3):
+            sns.distplot(X_all[X_all['dataset']==i]['activity'],label=dataset_labels[i],hist=False)
+        plt.legend()
+        plt.xlabel("Activity scores (before scaling)")
+        plt.savefig(output_file_name+"/activity_score_after.svg", dpi=150)
+        plt.close()
+    else:
+        X_all['training']=[1]*X_all.shape[0]
+    X_all=X_all[X_all['training']==1]
+    estimator.fit(np.array(X_all[headers]),np.array(X_all['activity']))
     os.mkdir(output_file_name+'/saved_model')
     filename = output_file_name+'/saved_model/CRISPRi_model.sav'
     pickle.dump(estimator, open(filename, 'wb')) 
     filename = output_file_name+'/saved_model/CRISPRi_headers.sav'
     pickle.dump(headers, open(filename, 'wb'))
-    print(time.asctime(),'Start model interpretation...')
-    ### model validation with validation dataset
-    if choice =='lasso':
-        coef=pandas.DataFrame(data={'coef':estimator.coef_,'feature':headers})
-        coef=coef.sort_values(by='coef',ascending=False)
-        coef=coef[:15]
-        pal = sns.color_palette('pastel')
-        sns.barplot(data=coef,x='feature',y='coef',color=pal.as_hex()[0])
-        plt.xticks(rotation=90)
-        plt.subplots_adjust(bottom=0.35)
-        plt.savefig(output_file_name+"/coef.svg",dpi=400)
-        plt.close()
-    elif choice=='rf':
-        SHAP(estimator,X_all,headers)
-        
-    ##split the combined training set into train and test
-    guide_train, guide_test = sklearn.model_selection.train_test_split(guideid_set, test_size=test_size,random_state=np.random.seed(111))  
-    
-    X_train = X_df[X_df['guideid'].isin(guide_train)]
-    X_train=X_train[X_train['dataset_col'].isin(training_sets)]
-    y_train=np.array(X_train['activity'])
-    X_train = np.array(X_train[headers])
-    
-    X_test = X_df[X_df['guideid'].isin(guide_test)]
-    y_test=np.array(X_test['activity'])
-    X_test = np.array(X_test[headers])
-
-    estimator.fit(X_train,y_train)
-    predictions = estimator.predict(X_test)
-    Evaluation(output_file_name,y_test,predictions,"X_test")
     
     logging_file.write("Median Spearman correlation for all gRNAs of each gene: \n")
     labels= ['E75 Rousset','E18 Cui','Wang']
@@ -630,6 +572,22 @@ def main():
         p=plot[plot['dataset']==k]
         logging_file.write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
     logging_file.write("Mixed 3 datasets (median/mean): %s / %s \n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
+    
+    print(time.asctime(),'Start model interpretation...')
+    ### model validation with validation dataset
+    if choice =='lasso':
+        coef=pandas.DataFrame(data={'coef':estimator.coef_,'feature':headers})
+        coef=coef.sort_values(by='coef',ascending=False)
+        coef=coef[:15]
+        pal = sns.color_palette('pastel')
+        sns.barplot(data=coef,x='feature',y='coef',color=pal.as_hex()[0])
+        plt.xticks(rotation=90)
+        plt.subplots_adjust(bottom=0.35)
+        plt.savefig(output_file_name+"/coef.svg",dpi=400)
+        plt.close()
+    elif choice=='rf':
+        SHAP(estimator,X_all,headers)
+        
     logging_file.close()
     print(time.asctime(),'Done.')
 
