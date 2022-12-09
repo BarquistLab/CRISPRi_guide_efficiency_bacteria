@@ -335,7 +335,7 @@ plot=pandas.DataFrame.from_dict(plot)
 for k in range(3):
     p=plot[plot['dataset']==k]
     open(output_file_name + '/log.txt','a').write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
-open(output_file_name + '/log.txt','a').write("Mixed 3 datasets (median/mean): %s / %s \n\n\n" % (np.nanmedian(plot['sr']),np.nanmean(p['sr'])))
+open(output_file_name + '/log.txt','a').write("Mixed 3 datasets (median/mean): %s / %s \n\n\n" % (np.nanmedian(p['sr']),np.nanmean(p['sr'])))
 
 print(time.asctime(),'Start saving model...')    
 #save model trained with all guides
