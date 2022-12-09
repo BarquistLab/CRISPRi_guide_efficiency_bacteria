@@ -82,6 +82,11 @@ except:
         print("Please input valid choice..\nAbort.")
         sys.exit()
 datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
+### test crisprioff energy features
+datasets=["/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/E75_Rousset_crisproff.csv",
+          "/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/E18_Cui_crisproff.csv",
+          "/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/Wang_dataset_crisproff.csv"]
+
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
 
 def self_encode(sequence):#one-hot encoding for single nucleotide features
@@ -160,6 +165,10 @@ def DataFrame_input(df):
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
     if split=='gene_dropdistance':
         drop_features+=["distance_start_codon","distance_start_codon_perc"]#,'guide_GC_content', 'homopolymers', 'MFE_hybrid_full', 'MFE_hybrid_seed', 'MFE_homodimer_guide', 'MFE_monomer_guide']
+    
+    ### test crisprioff energy features
+    drop_features+=['MFE_hybrid_full','MFE_hybrid_seed','MFE_homodimer_guide','MFE_monomer_guide','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
+   
     for feature in drop_features:
         try:
             df=df.drop(feature,1)
@@ -439,7 +448,8 @@ def main():
                     space=space,
                     algo=tpe.suggest,
                     max_evals=n_trials,
-                    trials=trials)
+                    trials=trials,
+                    rstate=np.random.default_rng(111))
         # # # # # # find the trial with lowest loss value. this is what we consider the best one
         idx = np.argmin(trials.losses())
         # # these should be the training parameters to use to achieve the best score in best trial

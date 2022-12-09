@@ -247,7 +247,7 @@ class CrisprOn1DCNN(pl.LightningModule):
         )
 
         self.dense_layers2 = nn.Sequential(
-            nn.Linear(88, 80),
+            nn.Linear(85, 80),
             nn.ReLU(),
             nn.Dropout(0.3),
             nn.Linear(80, 60),

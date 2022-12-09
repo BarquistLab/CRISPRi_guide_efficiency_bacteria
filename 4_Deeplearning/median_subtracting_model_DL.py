@@ -91,7 +91,10 @@ except:
         sys.exit()
 datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
-
+### test crisprioff energy features
+datasets=["/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/E75_Rousset_crisproff.csv",
+          "/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/E18_Cui_crisproff.csv",
+          "/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/Wang_dataset_crisproff.csv"]
 def self_encode(sequence):#one-hot encoding for single nucleotide features
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
     nts=['A','T','C','G']
@@ -246,6 +249,9 @@ def DataFrame_input(df):
     drop_features=['scaled_log2FC','training','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','gene_essentiality',"geneid",
                    'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
+    ### test crisprioff energy features
+    drop_features+=['MFE_hybrid_full','MFE_hybrid_seed','MFE_homodimer_guide','MFE_monomer_guide','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
+    
     for feature in drop_features:
         try:
             df=df.drop(feature,1)

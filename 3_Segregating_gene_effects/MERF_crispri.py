@@ -86,6 +86,10 @@ except:
 open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
 open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)    
 datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
+### test crisprioff energy features
+datasets=["/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/E75_Rousset_crisproff.csv",
+          "/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/E18_Cui_crisproff.csv",
+          "/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/Wang_dataset_crisproff.csv"]
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
 
 logging_file= output_file_name+"/log.txt"
@@ -179,6 +183,10 @@ def DataFrame_input(df):
         drop_features=drop_features+["distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_expression_min","gene_expression_max"]
     if split=='gene_dropdistance':
         drop_features+=["distance_start_codon","distance_start_codon_perc"]
+    
+    ### test crisprioff energy features
+    drop_features+=['MFE_hybrid_full','MFE_hybrid_seed','MFE_homodimer_guide','MFE_monomer_guide','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
+    
     for feature in drop_features:
         try:
             df=df.drop(feature,1)
@@ -376,7 +384,7 @@ for i in [10,15,30]:
     plt.xticks(fontsize='medium')
     plt.savefig(output_file_name+"/shap_value_top%s.svg"%(i),dpi=400)
     plt.close()    
-
+'''
 print(time.asctime(),'Start calculating interaction values.') 
 #SHAP interaction values
 shap_values = treexplainer.shap_values(X_all.iloc[:1000,:],check_additivity=False)
@@ -469,7 +477,7 @@ for pair in pairs:
     plt.savefig(output_file_name+"/shap_dependence_plot_%s_%s.svg"%(pair[0],pair[1]),dpi=400)
     plt.close()    
 
-
+'''
 ###split again for evaluating the difference between train and test and plots
 guide_train, guide_test = sklearn.model_selection.train_test_split(guideid_set, test_size=test_size,random_state=np.random.seed(111))  
 guide_train, guide_val = sklearn.model_selection.train_test_split(guide_train, test_size=test_size,random_state=np.random.seed(111))  
@@ -496,7 +504,7 @@ clusters_test=test['clusters']
 
 mrf_lgbm = MERF(estimator,max_iterations=15)
 mrf_lgbm.fit(X_train, Z_train, clusters_train, y_train,X_val, Z_val, clusters_val, y_val)
-pickle.dump(mrf_lgbm.trained_fe_model, open(output_file_name+"/trained_fe_model.pkl", 'wb'))
+# pickle.dump(mrf_lgbm.trained_fe_model, open(output_file_name+"/trained_fe_model.pkl", 'wb'))
 open(output_file_name + '/log.txt','a').write("\n\n\nDone training model: %s s\n"%round(time.time()-start,3))
 predictions = mrf_lgbm.predict(X_test, Z_test, clusters_test)  
 spearman_rho,spearman_p_value=spearmanr(np.array(y_test), np.array(predictions))
