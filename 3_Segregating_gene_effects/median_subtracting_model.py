@@ -571,7 +571,7 @@ def main():
     for k in range(3):
         p=plot[plot['dataset']==k]
         logging_file.write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
-    logging_file.write("Mixed 3 datasets (median/mean): %s / %s \n" % (np.nanmedian(p['sr']),np.nanmean(p['sr'])))
+    logging_file.write("Mixed 3 datasets (median/mean): %s / %s \n" % (np.nanmedian(plot['sr']),np.nanmean(plot['sr'])))
     
     print(time.asctime(),'Start model interpretation...')
     ### model validation with validation dataset
