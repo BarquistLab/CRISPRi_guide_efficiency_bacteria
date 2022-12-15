@@ -49,7 +49,7 @@ Which datasets to use:
     0,1,2: all 3 datasets
 default: 0,1,2""")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
-parser.add_argument("-c", "--choice", default="rf", help="If train on random forest or LASSO model, rf/lasso. default: rf")
+parser.add_argument("-c", "--choice", default="rf", help="If train on random forest or LASSO model, rf/lasso/pasteur. default: rf")
 parser.add_argument("-s", "--split", default='gene', help="train-test split stratege. gene/gene_dropdistance. gene_dropdistance: To test the models without distance associated features. default: gene")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
@@ -155,6 +155,10 @@ def DataFrame_input(df):
     sequences=list(df['sequence'])
     #define guideid
     guideids=np.array(list(df['geneid']))
+    
+    if choice=='pasteur':
+        genome_pos_5_ends=list(df['genome_pos_5_end'])
+        genome_pos_3_ends=list(df['genome_pos_3_end'])
     # remove columns that are not used in training
     drop_features=['training','scaled_log2FC','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
@@ -198,7 +202,11 @@ def DataFrame_input(df):
     logging_file.write('Number of features: %s\n'%len(headers))
     logging_file.write('Features: %s\n'%",".join(headers))
     
-    return X, y, headers,dataset_col,log2FC,median , guideids,sequences,geneids,distance_start_codons
+
+    if choice=='pasteur':
+        return X, y, headers,dataset_col,log2FC , guideids,sequences,geneids,distance_start_codons,genome_pos_5_ends,genome_pos_3_ends
+    else:
+        return X, y, headers,dataset_col,log2FC , guideids,sequences,geneids,distance_start_codons
 
 
 def Evaluation(output_file_name,y,predictions,name):
@@ -383,16 +391,26 @@ def main():
     training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
     #dropping unnecessary features and encode sequence features
-    X,y,headers,dataset_col,log2FC,median,guideids, sequences,geneids,distance_start_codons= DataFrame_input(training_df)
+    if choice=='pasteur':
+        X,y,headers,dataset_col,log2FC,guideids, sequences,geneids,distance_start_codons,genome_pos_5_ends,genome_pos_3_ends= DataFrame_input(training_df)
+    else:
+        X,y,headers,dataset_col,log2FC,guideids, sequences,geneids,distance_start_codons= DataFrame_input(training_df)
     open(output_file_name + '/log.txt','a').write("Data input Time: %s seconds\n\n" %('{:.2f}'.format(time.time()-start_time)))  
-    X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,median,guideids,dataset_col,sequences,geneids],
-                              columns=headers+['activity','log2FC','median','guideid','dataset','sequence','geneid'])
+    
+    if choice =='pasteur':
+        X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,guideids,dataset_col,sequences,geneids,genome_pos_5_ends,genome_pos_3_ends],
+                                  columns=headers+['activity','log2FC','guideid','dataset','sequence','geneid',"genome_pos_5_end","genome_pos_3_end"])
+    else:
+        X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,guideids,dataset_col,sequences,geneids],
+                              columns=headers+['activity','log2FC','guideid','dataset','sequence','geneid'])
     if split=='gene_dropdistance':
         X_df=pandas.DataFrame(data=np.c_[X_df,distance_start_codons],columns=X_df.columns.values.tolist()+['distance_start_codon'])
     dtypes=dict()
     for feature in X_df.columns.values:
         if feature != 'geneid' and feature !='sequence':
             dtypes.update({feature:float})
+        if feature in ['genome_pos_5_end','genome_pos_3_end']:
+            dtypes.update({feature:int})
     X_df=X_df.astype(dtypes)
     guideid_set=list(set(guideids)) #use the previous split sets for comparison
     
@@ -448,6 +466,11 @@ def main():
         estimator=linear_model.Lasso(random_state = np.random.seed(111),**params)
         ### tested optimized lasso for split=='gene'
         # estimator=linear_model.Lasso(alpha=0.006978754283387303, copy_X=True, fit_intercept=True,max_iter=1000, normalize=False, positive=False, precompute=False,random_state= np.random.seed(111), selection='cyclic', tol=0.0001, warm_start=False)
+    if choice=='pasteur':
+        estimator=pickle.load(open('Pasteur_model.pkl','rb'))
+        params=estimator.get_params()
+        params.update({"random_state":np.random.seed(111)})
+        estimator.set_params(**params)
         
     open(output_file_name + '/log.txt','a').write("Estimator:"+str(estimator)+"\n")
     
@@ -485,20 +508,42 @@ def main():
             train = datafusion_scaling(train)
         else:
             train['training']=[1]*train.shape[0]
-            
         X_train=train[train['training']==1] #only used
+        if choice=='pasteur':
+            training_seq,guides_index=find_target(X_train)
+            training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
+            training_seq=training_seq.reshape(training_seq.shape[0],-1)
+            X_train=X_train.loc[guides_index]
+        
         
         y_train=np.array(X_train['activity'])
-        X_train=np.array(X_train[headers])
+        
+        if choice=='pasteur':
+            X_train=training_seq
+        else:
+            X_train=np.array(X_train[headers])
+        
         test = X_df[X_df['guideid'].isin(test_index)]
+        if choice=='pasteur':
+            training_seq,guides_index=find_target(test)
+            training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
+            training_seq=training_seq.reshape(training_seq.shape[0],-1)
+            test=test.loc[guides_index]
+        
         y_test=np.array(test['activity'])
         log2FC_test = np.array( test['log2FC'])
-        # scaled_log2FC_test=np.array(test['scaled_log2FC'])
-        # median_test =np.array( test['median'])
-        X_test=np.array(test[headers])
+        
+        if choice=='pasteur':
+            X_test=training_seq
+        else:
+            X_test=np.array(test[headers])
         
         estimator = estimator.fit(X_train,y_train)
-        predictions = estimator.predict(X_test)
+        
+        if choice=='pasteur':
+            predictions = estimator.predict(X_test).reshape(-1, 1).ravel()
+        else:
+            predictions = estimator.predict(X_test)
         
         iteration+=1
         iteration_predictions['log2FC'].append(list(log2FC_test))
@@ -542,7 +587,14 @@ def main():
     else:
         X_all['training']=[1]*X_all.shape[0]
     X_all=X_all[X_all['training']==1]
-    estimator.fit(np.array(X_all[headers]),np.array(X_all['activity']))
+    if choice=='pasteur':
+        training_seq,guides_index=find_target(X_all)
+        training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
+        training_seq=training_seq.reshape(training_seq.shape[0],-1)
+        X_all=X_all.loc[guides_index]
+        estimator.fit(training_seq,np.array(X_all['activity']))
+    else:
+        estimator.fit(np.array(X_all[headers]),np.array(X_all['activity']))
     os.mkdir(output_file_name+'/saved_model')
     filename = output_file_name+'/saved_model/CRISPRi_model.sav'
     pickle.dump(estimator, open(filename, 'wb')) 

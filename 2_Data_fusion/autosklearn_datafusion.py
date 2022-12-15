@@ -125,13 +125,19 @@ def DataFrame_input(df,coding_strand=1):
     logging_file= open(output_file_name + '/log.txt','a')
     df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==coding_strand)]
     df=df.dropna()
-    for i in list(set(list(df['geneid']))):
-        df_gene=df[df['geneid']==i]
-        for j in df_gene.index:
-            df.at[j,'Nr_guide']=df_gene.shape[0]
+    # for i in list(set(list(df['geneid']))):
+    #     df_gene=df[df['geneid']==i]
+    #     for j in df_gene.index:
+    #         df.at[j,'Nr_guide']=df_gene.shape[0]
+    for dataset in range(len(set(df['dataset']))):
+        dataset_df=df[df['dataset']==dataset]
+        for i in list(set(dataset_df['geneid'])):
+            gene_df=dataset_df[dataset_df['geneid']==i]
+            for j in gene_df.index:
+                df.at[j,'Nr_guide']=gene_df.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
     df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
-    
+    logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
     sequences=list(dict.fromkeys(df['sequence']))
     y=np.array(df['log2FC'],dtype=float)
     ### one hot encoded sequence features
@@ -142,7 +148,7 @@ def DataFrame_input(df,coding_strand=1):
         PAM_encoded.append(self_encode(df['PAM'][i]))
         sequence_encoded.append(self_encode(df['sequence'][i]))
         dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
-        df.at[i,'geneid']=int(df['geneid'][i][1:])
+        # df.at[i,'geneid']=int(df['geneid'][i][1:])
         df.at[i,'guideid']=sequences.index(df['sequence'][i])
     #check if the length of gRNA and PAM from all samples is the same
     if len(list(set(map(len,list(df['PAM'])))))==1:
@@ -162,7 +168,7 @@ def DataFrame_input(df,coding_strand=1):
     # remove columns that are not used in training
     drop_features=['Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality',
-                   'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
+                   'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70','geneid']
     for feature in drop_features:
         try:
             df=df.drop(feature,1)
@@ -175,7 +181,7 @@ def DataFrame_input(df,coding_strand=1):
     X=X[headers]
     ### feat_type for auto sklearn
     feat_type=[]
-    categorical_indicator=['intergenic','coding_strand','geneid','dataset',"gene_strand","gene"]
+    categorical_indicator=['dataset']
     feat_type=['Categorical' if headers[i] in categorical_indicator else 'Numerical' for i in range(len(headers)) ] 
     ### add one-hot encoded sequence features columns
     PAM_encoded=np.array(PAM_encoded)

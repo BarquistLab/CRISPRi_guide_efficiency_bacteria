@@ -130,12 +130,20 @@ open(output_file_name + '/log.txt','a').write("Total number of guides in dataset
 open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
 
 
-for i in list(set(list(combined['geneid']))):
-    df_gene=combined[combined['geneid']==i]
-    for j in df_gene.index:
-        combined.at[j,'Nr_guide']=df_gene.shape[0]
-logging.info("Number of guides for essential genes: %s \n" % combined.shape[0])
+# for i in list(set(list(combined['geneid']))):
+#     df_gene=combined[combined['geneid']==i]
+#     for j in df_gene.index:
+#         combined.at[j,'Nr_guide']=df_gene.shape[0]
+        
+for dataset in range(len(set(combined['dataset']))):
+        dataset_df=combined[combined['dataset']==dataset]
+        for i in list(set(dataset_df['geneid'])):
+            gene_df=dataset_df[dataset_df['geneid']==i]
+            for j in gene_df.index:
+                combined.at[j,'Nr_guide']=gene_df.shape[0]
+open(output_file_name + '/log.txt','a').write("Number of guides for essential genes: %s \n" % combined.shape[0])
 combined=combined[combined['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
+open(output_file_name + '/log.txt','a').write("Number of guides after filtering: %s \n" % combined.shape[0])
 guide_sequence_set=list(dict.fromkeys(combined['sequence']))
 ### one hot encoded sequence features
 PAM_encoded=[]
@@ -145,7 +153,7 @@ for i in combined.index:
     PAM_encoded.append(self_encode(combined['PAM'][i]))
     sequence_encoded.append(self_encode(combined['sequence'][i]))   
     dinucleotide_encoded.append(dinucleotide(combined['sequence_30nt'][i]))
-    combined.at[i,'geneid']=int(combined['geneid'][i][1:])
+    # combined.at[i,'geneid']=int(combined['geneid'][i][1:])
     combined.at[i,'guideid']=guide_sequence_set.index(combined['sequence'][i])
 #check if the length of gRNA and PAM from all samples is the same
 if len(list(set(map(len,list(combined['PAM'])))))==1:
@@ -162,8 +170,8 @@ else:
     print("error: sequence len")
 guideids=np.array(list(combined['guideid']))
 #drop features
-X=combined.drop(['guideid',"No.","genename","gene_strand","gene_5","gene_biotype","gene_3","genome_pos_5_end","genome_pos_3_end",\
-                 'gene_essentiality','intergenic','guide_strand','coding_strand','PAM','sequence','sequence_30nt','Nr_guide'],1)
+X=combined.drop(['geneid','guideid',"No.","genename","gene_strand","gene_5","gene_biotype","gene_3","genome_pos_5_end","genome_pos_3_end",\
+                 'gene_essentiality','intergenic','guide_strand','coding_strand','PAM','sequence','sequence_30nt','Nr_guide','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70'],1)
 features=X.columns.values.tolist()
 X=np.c_[X,sequence_encoded,PAM_encoded,dinucleotide_encoded]
     
@@ -296,7 +304,8 @@ ax_yDist.hist(np.array(predictions['predict']),bins=70,orientation='horizontal',
 ax_yDist.set(xlabel='count')
 ax_yDist.tick_params(labelsize=6,pad=2)
 ax_main.text(0.55,0.03,"Spearman R: {0}".format(round(spearman_rho,2)),transform=ax_main.transAxes,fontsize=10)
-plt.savefig(output_file_name+'/scatterplot.svg',dpi=300)
+plt.savefig(output_file_name+'/scatterplot.svg')
+plt.savefig(output_file_name+'/scatterplot.png',dpi=300)
 plt.close()
 
 #SHAP values
@@ -311,6 +320,7 @@ import shap
 shap.summary_plot(shap_values, X, plot_type="bar",show=False,color_bar=True,max_display=10)
 plt.subplots_adjust(left=0.4, top=0.95,bottom=0.2)
 plt.xticks(fontsize='medium')
+plt.savefig(output_file_name+"/shap_value_bar.svg")
 plt.savefig(output_file_name+"/shap_value_bar.png",dpi=400)
 plt.close()
 for i in [10,15,30]:
@@ -318,6 +328,7 @@ for i in [10,15,30]:
     plt.subplots_adjust(left=0.4, top=0.95,bottom=0.2)
     plt.yticks(fontsize='small')
     plt.xticks(fontsize='small')
+    plt.savefig(output_file_name+"/shap_value_top%s.svg"%(i))
     plt.savefig(output_file_name+"/shap_value_top%s.png"%(i),dpi=400)
     plt.close()
 

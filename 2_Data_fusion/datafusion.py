@@ -42,6 +42,8 @@ Example: python datafusion.py -o test -c autosklearn -training 0,1,2
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
+parser.add_argument("-s", "--split", default='guide', help="train-test split stratege. gene/guide. default: guide")
+
 parser.add_argument("-training", type=str, default='0,1,2', 
                     help="""
 Which datasets to use: 
@@ -63,6 +65,8 @@ Which model type to run:
     svr: SVR
     histgb: Histogram-based gradient boosting
     rf: Random forest
+    lasso_hyperopt: LASSO with hyperparameters same as the MS model
+    rf_hyperopt: RF with hyperparameters same as the MS model
     default: autosklearn
 """)
 
@@ -73,6 +77,7 @@ output_file_name = args.output
 folds=args.folds
 test_size=args.test_size
 choice=args.choice
+split=args.split
 datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
 
@@ -119,13 +124,19 @@ def DataFrame_input(df,coding_strand=1):
     logging_file= open(output_file_name + '/log.txt','a')
     df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==coding_strand)]
     df=df.dropna()
-    for i in list(set(list(df['geneid']))):
-        df_gene=df[df['geneid']==i]
-        for j in df_gene.index:
-            df.at[j,'Nr_guide']=df_gene.shape[0]
+    # for i in list(set(list(df['geneid']))):
+    #     df_gene=df[df['geneid']==i]
+    #     for j in df_gene.index:
+    #         df.at[j,'Nr_guide']=df_gene.shape[0]
+    for dataset in range(len(set(df['dataset']))):
+        dataset_df=df[df['dataset']==dataset]
+        for i in list(set(dataset_df['geneid'])):
+            gene_df=dataset_df[dataset_df['geneid']==i]
+            for j in gene_df.index:
+                df.at[j,'Nr_guide']=gene_df.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
     df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
-    
+    logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
     sequences=list(dict.fromkeys(df['sequence']))
     y=np.array(df['log2FC'],dtype=float)
     ### one hot encoded sequence features
@@ -151,9 +162,12 @@ def DataFrame_input(df,coding_strand=1):
         dinucleotide_len=int(list(set(map(len,list(df['sequence_30nt']))))[0])
     else:
         print("error: sequence len")
-    guideids=np.array(list(df['guideid']))
+    if split=='guide':
+        guideids=np.array(list(df['guideid']))
+    elif split=='gene':
+        guideids=np.array(list(df['geneid']))
     # remove columns that are not used in training
-    drop_features=['std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
+    drop_features=['geneid','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality',
                    'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
     for feature in drop_features:
@@ -273,8 +287,8 @@ def main():
         from sklearn.experimental import enable_hist_gradient_boosting
         from sklearn.ensemble import HistGradientBoostingRegressor
         from sklearn.ensemble import RandomForestRegressor
-        if training_sets==[0]:
-            estimator=RandomForestRegressor(bootstrap=False,criterion='friedman_mse',
+        if training_sets in [[0],[1],[0,1]]:
+            estimator=RandomForestRegressor(bootstrap=True,criterion='friedman_mse',
                         n_estimators=512,
                         min_samples_leaf=1,
                         min_samples_split=4,
@@ -284,7 +298,7 @@ def main():
                         min_impurity_decrease=0.0,
                         min_weight_fraction_leaf=0,
                         random_state=np.random.seed(111))
-        elif training_sets in [[0,2],[1,2],[0,1,2]]:
+        elif training_sets in [[2],[0,2],[1,2]]:
             estimator=RandomForestRegressor(bootstrap=False,criterion='friedman_mse',
                         n_estimators=512,
                         min_samples_leaf=18,
@@ -295,7 +309,7 @@ def main():
                         min_impurity_decrease=0.0,
                         min_weight_fraction_leaf=0,
                         random_state=np.random.seed(111))
-        elif training_sets in [[1],[2]]:
+        elif training_sets in [[0,1,2]]:
             estimator=HistGradientBoostingRegressor(loss='least_squares',learning_rate=0.10285955822720894,
                         max_iter=512,
                         min_samples_leaf=1,
@@ -303,17 +317,6 @@ def main():
                         max_leaf_nodes=8,
                         max_bins=255,
                         l2_regularization=4.81881052684467e-05,
-                        tol=1e-07,scoring='loss',
-                        n_iter_no_change=0,
-                        validation_fraction=None,verbose=0,warm_start=False,random_state=np.random.seed(111))
-        elif training_sets in [[0,1]]:
-              estimator=HistGradientBoostingRegressor(loss='least_squares',learning_rate=0.11742891344336259,
-                        max_iter=512,
-                        min_samples_leaf=12,
-                        max_depth=None,
-                        max_leaf_nodes=14,
-                        max_bins=255,
-                        l2_regularization=3.0777178597597097e-10,
                         tol=1e-07,scoring='loss',
                         n_iter_no_change=0,
                         validation_fraction=None,verbose=0,warm_start=False,random_state=np.random.seed(111))
@@ -333,8 +336,16 @@ def main():
     if choice=='rf':
         from sklearn.ensemble import RandomForestRegressor
         estimator=RandomForestRegressor(random_state=np.random.seed(111))
-    
-        
+    if choice=='lasso_hyperopt':
+        estimator = linear_model.Lasso(alpha=0.00805289357794064,random_state = np.random.seed(111))
+    if choice=='rf_hyperopt':
+        from sklearn.ensemble import RandomForestRegressor
+        estimator=RandomForestRegressor(bootstrap=True, criterion='friedman_mse', max_depth=None, 
+                        max_features=0.22442857329791677, max_leaf_nodes=None,
+                        min_impurity_decrease=0.0, min_impurity_split=None,
+                        min_samples_leaf=18, min_samples_split=16,
+                        min_weight_fraction_leaf=0.0, n_estimators=512, n_jobs=1,
+                        verbose=0, warm_start=False,random_state = np.random.seed(111))
     open(output_file_name + '/log.txt','a').write("Estimator:"+str(estimator)+"\n")
     X_df=pandas.DataFrame(data=np.c_[X,y,guideids],columns=headers+['log2FC','guideid'])
     #k-fold cross validation

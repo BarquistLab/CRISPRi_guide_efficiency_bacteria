@@ -118,12 +118,19 @@ def DataFrame_input(df,coding_strand=1):
     logging_file= open(output_file_name + '/log.txt','a')
     df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==coding_strand)]
     df=df.dropna()
-    for i in list(set(list(df['geneid']))):
-        df_gene=df[df['geneid']==i]
-        for j in df_gene.index:
-            df.at[j,'Nr_guide']=df_gene.shape[0]
+    # for i in list(set(list(df['geneid']))):
+    #     df_gene=df[df['geneid']==i]
+    #     for j in df_gene.index:
+    #         df.at[j,'Nr_guide']=df_gene.shape[0]
+    for dataset in range(len(set(df['dataset']))):
+        dataset_df=df[df['dataset']==dataset]
+        for i in list(set(dataset_df['geneid'])):
+            gene_df=dataset_df[dataset_df['geneid']==i]
+            for j in gene_df.index:
+                df.at[j,'Nr_guide']=gene_df.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
     df=df[df['Nr_guide']>=5] #keep only genes with more than 5 guides from all 3 datasets
+    logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
     
     sequences=list(dict.fromkeys(df['sequence']))
     y=np.array(df['log2FC'],dtype=float)
@@ -154,7 +161,7 @@ def DataFrame_input(df,coding_strand=1):
     guideids=np.array(list(df['guideid']))
     
     # remove columns that are not used in training
-    drop_features=['Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
+    drop_features=['geneid','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90','off_target_70_80','off_target_60_70']
     for feature in drop_features:
         try:

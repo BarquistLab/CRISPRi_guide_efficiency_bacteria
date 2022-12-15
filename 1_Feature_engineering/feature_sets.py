@@ -42,14 +42,12 @@ parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size
 parser.add_argument("-c","--choice", type=str, default='all', 
                     help="""
 Which feature sets to use: 
-    all: all 574 features
+    all: all 573 features
     only_seq: only sequence features
     add_distance: sequence and distance features
     add_MFE:sequence, distance, and MFE features
     only_guide:all 564 guide features
-    guide_geneid: 564 guide features and geneID
     gene_seq:sequence features and gene features
-    except_geneid: all 573 features except for geneID
 default: all""")
 args = parser.parse_args()
 choice=args.choice
@@ -57,7 +55,7 @@ output_file_name = args.output
 folds=args.folds
 test_size=args.test_size
 
-training_sets=[0]
+training_sets=[0]  ###For the results in the paper, only tested on E75 Rousset data.
 datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
 
@@ -100,12 +98,19 @@ def DataFrame_input(df,coding_strand=1):
     logging_file= open(output_file_name + '/log.txt','a')
     df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==coding_strand)]
     df=df.dropna()
-    for i in list(set(list(df['geneid']))):
-        df_gene=df[df['geneid']==i]
-        for j in df_gene.index:
-            df.at[j,'Nr_guide']=df_gene.shape[0]
+    # for i in list(set(list(df['geneid']))):
+    #     df_gene=df[df['geneid']==i]
+    #     for j in df_gene.index:
+    #         df.at[j,'Nr_guide']=df_gene.shape[0]
+    for dataset in range(len(set(df['dataset']))):
+        dataset_df=df[df['dataset']==dataset]
+        for i in list(set(dataset_df['geneid'])):
+            gene_df=dataset_df[dataset_df['geneid']==i]
+            for j in gene_df.index:
+                df.at[j,'Nr_guide']=gene_df.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
-    df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
+    df=df[df['Nr_guide']>=5] #keep only genes with more than 5 guides from all 3 datasets
+    logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
     
     sequences=list(dict.fromkeys(df['sequence']))
     y=np.array(df['log2FC'],dtype=float)
@@ -135,7 +140,7 @@ def DataFrame_input(df,coding_strand=1):
     
     guideids=np.array(list(df['guideid']))
     # remove columns that are not used in training
-    drop_features=['std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
+    drop_features=['geneid','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
     for feature in drop_features:
         try:
@@ -156,10 +161,6 @@ def DataFrame_input(df,coding_strand=1):
         headers=['distance_start_codon','distance_start_codon_perc']+['MFE_hybrid_full','MFE_hybrid_seed','MFE_homodimer_guide','MFE_monomer_guide']
     elif choice=='gene_seq':
         headers=[item for item in headers if item in gene_features]
-    elif choice=='except_geneid':
-        headers.remove("geneid")
-    elif choice=='guide_geneid':
-        headers=[item for item in headers if item not in gene_features]+['geneid']
     X=X[headers]
     ### add one-hot encoded sequence features columns
     PAM_encoded=np.array(PAM_encoded)
@@ -274,8 +275,8 @@ def main():
 
     from sklearn.ensemble import RandomForestRegressor
     #optimized models from auto-sklearn
-    if  choice=='all' or choice=='except_geneid' or choice=='guide_geneid' or choice=='gene_seq':
-        estimator=RandomForestRegressor(bootstrap=False,criterion='friedman_mse',
+    if  choice=='all':
+        estimator=RandomForestRegressor(bootstrap=True,criterion='friedman_mse',
                 n_estimators=512,
                 min_samples_leaf=1,
                 min_samples_split=4,
@@ -285,19 +286,46 @@ def main():
                 min_impurity_decrease=0.0,
                 min_weight_fraction_leaf=0,
                 random_state=np.random.seed(111))
-    elif choice=='only_guide' or choice=='add_MFE' or choice=='add_distance' or choice=='only_seq':
-        estimator=RandomForestRegressor(bootstrap=False,criterion='friedman_mse',
+    elif choice=='only_seq' or  choice=='only_guide':
+        estimator=RandomForestRegressor(bootstrap=True,criterion='mse',
                 n_estimators=512,
-                min_samples_leaf=18,
-                min_samples_split=16,
+                min_samples_leaf=3,
+                min_samples_split=12,
                 max_depth=None,
                 max_leaf_nodes=None,
-                max_features=0.22442857329791677,
+                max_features=0.9209937718223583,
                 min_impurity_decrease=0.0,
                 min_weight_fraction_leaf=0,
                 random_state=np.random.seed(111))
-        
-    
+    elif choice=='add_distance' or choice=='add_MFE':
+        estimator=RandomForestRegressor(bootstrap=True,criterion='mse',
+                n_estimators=512,
+                min_samples_leaf=3,
+                min_samples_split=3,
+                max_depth=None,
+                max_leaf_nodes=None,
+                max_features=0.5956294688991997,
+                min_impurity_decrease=0.0,
+                min_weight_fraction_leaf=0,
+                random_state=np.random.seed(111))
+    elif choice=='gene_seq':
+        from sklearn.experimental import enable_hist_gradient_boosting
+        from sklearn.ensemble import HistGradientBoostingRegressor
+        estimator=HistGradientBoostingRegressor(loss='least_squares',learning_rate=0.10285955822720894,
+                        max_iter=512,
+                        min_samples_leaf=1,
+                        max_depth=None,
+                        max_leaf_nodes=8,
+                        max_bins=255,
+                        l2_regularization=4.81881052684467e-05,
+                        tol=1e-07,scoring='loss',
+                        n_iter_no_change=0,
+                        validation_fraction=None,verbose=0,warm_start=False,random_state=np.random.seed(111))
+    else:
+        print('Unknown choice. Available -c options:\nall: all 573 features\nonly_seq: only sequence features\nadd_distance: sequence and distance features\nadd_MFE:sequence, distance, and MFE features\nonly_guide:all 564 guide features\ngene_seq:sequence features and gene features')
+        print("Please input another -c option and rerun the script.")
+        print("Abort.")
+        sys.exit()
     
     open(output_file_name + '/log.txt','a').write("Estimator:"+str(estimator)+"\n")
     X_df=pandas.DataFrame(data=np.c_[X,y,guideids,dataset_col],columns=headers+['log2FC','guideid','dataset_col'])
