@@ -337,7 +337,7 @@ def main():
         from sklearn.ensemble import RandomForestRegressor
         estimator=RandomForestRegressor(random_state=np.random.seed(111))
     if choice=='lasso_hyperopt':
-        estimator = linear_model.Lasso(alpha=0.00805289357794064,random_state = np.random.seed(111))
+        estimator = linear_model.Lasso(alpha=0.008281527467092667,random_state = np.random.seed(111))
     if choice=='rf_hyperopt':
         from sklearn.ensemble import RandomForestRegressor
         estimator=RandomForestRegressor(bootstrap=True, criterion='friedman_mse', max_depth=None, 

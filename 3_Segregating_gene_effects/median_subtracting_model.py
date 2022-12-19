@@ -49,8 +49,9 @@ Which datasets to use:
     0,1,2: all 3 datasets
 default: 0,1,2""")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
-parser.add_argument("-c", "--choice", default="rf", help="If train on random forest or LASSO model, rf/lasso/pasteur. default: rf")
+parser.add_argument("-c", "--choice", default="rf", help="If train on random forest or LASSO or Pasteur model, rf/lasso/pasteur. default: rf")
 parser.add_argument("-s", "--split", default='gene', help="train-test split stratege. gene/gene_dropdistance. gene_dropdistance: To test the models without distance associated features. default: gene")
+parser.add_argument("-F", "--feature_set", default='all',type=str, help="feature set for training. all/pasteur. Pasteur: sequence features used for Pasteur model. default: all")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
 
@@ -64,10 +65,13 @@ if training_sets != None:
 else:
     training_sets=list(range(3))
 split=args.split
+feature_set=args.feature_set
 folds=args.folds
 test_size=args.test_size
 output_file_name=args.output
 choice=args.choice
+
+
 try:
     os.mkdir(output_file_name)
 except:
@@ -103,7 +107,31 @@ def dinucleotide(sequence):#encoding for dinucleotide features
             continue
         encoded[nt*len(nts)**2+dinucleotides.index(sequence[nt]+sequence[nt+1])]=1
     return encoded
-
+def encode(seq):
+    return np.array([[int(b==p) for b in seq] for p in ["A","T","G","C"]])
+def find_target(df,before=20,after=20):
+    from Bio import SeqIO
+    fasta_sequences = SeqIO.parse(open("../0_Datasets/NC_000913.3.fasta"),'fasta')    
+    for fasta in fasta_sequences:  # input reference genome
+        reference_fasta=fasta.seq 
+    extended_seq=[]
+    guides_index=list()
+    for i in df.index.values:
+        if len(df['sequence'][i])!=20 or df["genome_pos_5_end"][i]<20 or df["genome_pos_3_end"][i]<20 :
+            continue
+        guides_index.append(i)
+        if df["genome_pos_5_end"][i] > df["genome_pos_3_end"][i]:
+            extended_seq.append(str(reference_fasta[df["genome_pos_3_end"][i]-1-after:df["genome_pos_5_end"][i]+before].reverse_complement()))
+        else:
+            extended_seq.append(str(reference_fasta[df["genome_pos_5_end"][i]-1-before:df["genome_pos_3_end"][i]+after]))
+    return extended_seq,guides_index
+def encode_seqarr(seq,r):
+    '''One hot encoding of the sequence. r specifies the position range.'''
+    X = np.array(
+            [encode(''.join([s[i] for i in r])) for s in seq]
+        )
+    X = X.reshape(X.shape[0], -1)
+    return X
 def DataFrame_input(df):
     ###keep guides for essential genes
     logging_file= open(output_file_name + '/log.txt','a')
@@ -141,6 +169,7 @@ def DataFrame_input(df):
     log2FC=np.array(df['log2FC'],dtype=float)
     geneids=list(df['geneid'])
     distance_start_codons=list(df['distance_start_codon'])
+    
     ### one hot encoded sequence features
     PAM_encoded=[]
     sequence_encoded=[]
@@ -149,64 +178,97 @@ def DataFrame_input(df):
     for i in df.index:
         df.at[i,'geneid']=int(df['geneid'][i][1:])
         # df.at[i,'guideid']=guide_sequence_set.index(df['sequence'][i])
-        PAM_encoded.append(self_encode(df['PAM'][i]))
-        sequence_encoded.append(self_encode(df['sequence'][i]))
-        dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
+        if feature_set !='pasteur' and 'no_dinu' not in feature_set:
+            PAM_encoded.append(self_encode(df['PAM'][i]))
+            sequence_encoded.append(self_encode(df['sequence'][i]))
+            dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
+        elif "no_dinu" in feature_set:
+            sequence_encoded.append(self_encode(df['sequence_30nt'][i]))   
     sequences=list(df['sequence'])
     #define guideid
     guideids=np.array(list(df['geneid']))
     
-    if choice=='pasteur':
-        genome_pos_5_ends=list(df['genome_pos_5_end'])
-        genome_pos_3_ends=list(df['genome_pos_3_end'])
-    # remove columns that are not used in training
-    drop_features=['training','scaled_log2FC','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
-                   "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
-    if split=='gene_dropdistance':
-        drop_features+=["distance_start_codon","distance_start_codon_perc"]#,'guide_GC_content', 'homopolymers', 'MFE_hybrid_full', 'MFE_hybrid_seed', 'MFE_homodimer_guide', 'MFE_monomer_guide']
-    for feature in drop_features:
-        try:
-            df=df.drop(feature,1)
-        except KeyError:  
-            pass
+    # if choice=='pasteur':
+    genome_pos_5_ends=list(df['genome_pos_5_end'])
+    genome_pos_3_ends=list(df['genome_pos_3_end'])
+    
     y=np.array(df['activity_score'],dtype=float)
     median=np.array(df['median'],dtype=float)
     dataset_col=np.array(df['dataset'],dtype=float)
-    X=df.drop(['log2FC','activity_score','median'],1)
-    headers=list(X.columns.values)
-    features=['dataset','geneid',"gene_5","gene_strand","gene_GC_content","distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_length","gene_expression_min","gene_expression_max"]#
-    guide_features=[item for item in headers if item not in features]
-    X=X[guide_features]
-    headers=list(X.columns.values)
-    
-    ### add one-hot encoded sequence features columns
-    PAM_encoded=np.array(PAM_encoded)
-    sequence_encoded=np.array(sequence_encoded)
-    dinucleotide_encoded=np.array(dinucleotide_encoded)
-    X=np.c_[X,sequence_encoded,PAM_encoded,dinucleotide_encoded]
-    ###add one-hot encoded sequence features to headers
-    nts=['A','T','C','G']
-    for i in range(sequence_len):
+    if feature_set !='pasteur':
+        # remove columns that are not used in training
+        drop_features=['training','scaled_log2FC','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
+                       "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
+        if split=='gene_dropdistance':
+            drop_features+=["distance_start_codon","distance_start_codon_perc"]#,'guide_GC_content', 'homopolymers', 'MFE_hybrid_full', 'MFE_hybrid_seed', 'MFE_homodimer_guide', 'MFE_monomer_guide']
+        if 'drop_distance' in feature_set:
+            drop_features+=["distance_start_codon"]
+        if 'drop_dist_perc' in feature_set:
+            drop_features+=["distance_start_codon_perc"]
+        if 'drop_seed' in feature_set:
+            drop_features+=['MFE_hybrid_seed', 'MFE_homodimer_guide', 'MFE_monomer_guide']
+        if 'drop_full' in feature_set:
+            drop_features+=['MFE_hybrid_full', 'MFE_homodimer_guide', 'MFE_monomer_guide']
+        
+        for feature in drop_features:
+            try:
+                df=df.drop(feature,1)
+            except KeyError:  
+                pass
+        X=df.drop(['log2FC','activity_score','median'],1)
+        headers=list(X.columns.values)
+        features=['dataset','geneid',"gene_5","gene_strand","gene_GC_content","distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_length","gene_expression_min","gene_expression_max"]#
+
+        guide_features=[item for item in headers if item not in features]
+        X=X[guide_features]
+        headers=list(X.columns.values)
+        if 'no_dinu' not in feature_set:
+            ### add one-hot encoded sequence features columns
+            PAM_encoded=np.array(PAM_encoded)
+            sequence_encoded=np.array(sequence_encoded)
+            dinucleotide_encoded=np.array(dinucleotide_encoded)
+            X=np.c_[X,sequence_encoded,PAM_encoded,dinucleotide_encoded]
+            ###add one-hot encoded sequence features to headers
+            nts=['A','T','C','G']
+            for i in range(sequence_len):
+                for j in range(len(nts)):
+                    headers.append('sequence_%s_%s'%(i+1,nts[j]))
+            for i in range(PAM_len):
+                for j in range(len(nts)):
+                    headers.append('PAM_%s_%s'%(i+1,nts[j]))
+            items=list(itertools.product(nts,repeat=2))
+            dinucleotides=list(map(lambda x: x[0]+x[1],items))
+            for i in range(dinucleotide_len-1):
+                for dint in dinucleotides:
+                    headers.append(dint+str(i+1)+str(i+2))
+        elif "no_dinu" in feature_set:
+            X=np.c_[X,sequence_encoded] #
+            ###add one-hot encoded sequence features to headers
+            nts=['A','T','C','G']
+            for i in range(30):
+                for j in range(len(nts)):
+                    headers.append('sequence_%s_%s'%(i+1,nts[j]))
+        X=pandas.DataFrame(data=X,columns=headers)
+        
+    elif feature_set=='pasteur':
+        nts=["A","T","G","C"]
+        training_seq,guides_index=find_target(df)
+        training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
+        training_seq=training_seq.reshape(training_seq.shape[0],-1)
+        headers=list()
         for j in range(len(nts)):
-            headers.append('sequence_%s_%s'%(i+1,nts[j]))
-    for i in range(PAM_len):
-        for j in range(len(nts)):
-            headers.append('PAM_%s_%s'%(i+1,nts[j]))
-    items=list(itertools.product(nts,repeat=2))
-    dinucleotides=list(map(lambda x: x[0]+x[1],items))
-    for i in range(dinucleotide_len-1):
-        for dint in dinucleotides:
-            headers.append(dint+str(i+1)+str(i+2))
-    X=pandas.DataFrame(data=X,columns=headers)
-    
+            for i in range(14,20):
+                headers.append('sequence_%s_%s'%(i+1,nts[j]))
+            for i in range(1):
+                headers.append('PAM_%s_%s'%(i+1,nts[j]))
+            for i in range(0,16):
+                headers.append('plus_%s_%s'%(i+1,nts[j]))
+        X=pandas.DataFrame(data=training_seq,columns=headers)
+        
     logging_file.write('Number of features: %s\n'%len(headers))
     logging_file.write('Features: %s\n'%",".join(headers))
-    
 
-    if choice=='pasteur':
-        return X, y, headers,dataset_col,log2FC , guideids,sequences,geneids,distance_start_codons,genome_pos_5_ends,genome_pos_3_ends
-    else:
-        return X, y, headers,dataset_col,log2FC , guideids,sequences,geneids,distance_start_codons
+    return X, y, headers,dataset_col,log2FC , guideids,sequences,geneids,distance_start_codons,genome_pos_5_ends,genome_pos_3_ends
 
 
 def Evaluation(output_file_name,y,predictions,name):
@@ -252,31 +314,7 @@ def SHAP(estimator,X,headers):
         plt.xticks(fontsize='small')
         plt.savefig(output_file_name+"/shap_value_top%s.svg"%(i),dpi=400)
         plt.close()    
-def encode(seq):
-    return np.array([[int(b==p) for b in seq] for p in ["A","T","G","C"]])
-def find_target(df,before=20,after=20):
-    from Bio import SeqIO
-    fasta_sequences = SeqIO.parse(open("../0_Datasets/NC_000913.3.fasta"),'fasta')    
-    for fasta in fasta_sequences:  # input reference genome
-        reference_fasta=fasta.seq 
-    extended_seq=[]
-    guides_index=list()
-    for i in df.index.values:
-        if len(df['sequence'][i])!=20 or df["genome_pos_5_end"][i]<20 or df["genome_pos_3_end"][i]<20 :
-            continue
-        guides_index.append(i)
-        if df["genome_pos_5_end"][i] > df["genome_pos_3_end"][i]:
-            extended_seq.append(str(reference_fasta[df["genome_pos_3_end"][i]-1-after:df["genome_pos_5_end"][i]+before].reverse_complement()))
-        else:
-            extended_seq.append(str(reference_fasta[df["genome_pos_5_end"][i]-1-before:df["genome_pos_3_end"][i]+after]))
-    return extended_seq,guides_index
-def encode_seqarr(seq,r):
-    '''One hot encoding of the sequence. r specifies the position range.'''
-    X = np.array(
-            [encode(''.join([s[i] for i in r])) for s in seq]
-        )
-    X = X.reshape(X.shape[0], -1)
-    return X
+
 
 def is_number(s):
     if s is None:
@@ -391,19 +429,12 @@ def main():
     training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
     #dropping unnecessary features and encode sequence features
-    if choice=='pasteur':
-        X,y,headers,dataset_col,log2FC,guideids, sequences,geneids,distance_start_codons,genome_pos_5_ends,genome_pos_3_ends= DataFrame_input(training_df)
-    else:
-        X,y,headers,dataset_col,log2FC,guideids, sequences,geneids,distance_start_codons= DataFrame_input(training_df)
+    X,y,headers,dataset_col,log2FC,guideids, sequences,geneids,distance_start_codons,genome_pos_5_ends,genome_pos_3_ends= DataFrame_input(training_df)
     open(output_file_name + '/log.txt','a').write("Data input Time: %s seconds\n\n" %('{:.2f}'.format(time.time()-start_time)))  
     
-    if choice =='pasteur':
-        X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,guideids,dataset_col,sequences,geneids,genome_pos_5_ends,genome_pos_3_ends],
-                                  columns=headers+['activity','log2FC','guideid','dataset','sequence','geneid',"genome_pos_5_end","genome_pos_3_end"])
-    else:
-        X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,guideids,dataset_col,sequences,geneids],
-                              columns=headers+['activity','log2FC','guideid','dataset','sequence','geneid'])
-    if split=='gene_dropdistance':
+    X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,guideids,dataset_col,sequences,geneids,genome_pos_5_ends,genome_pos_3_ends],
+                                   columns=headers+['activity','log2FC','guideid','dataset','sequence','geneid',"genome_pos_5_end","genome_pos_3_end"])
+    if split=='gene_dropdistance' or feature_set=='pasteur':
         X_df=pandas.DataFrame(data=np.c_[X_df,distance_start_codons],columns=X_df.columns.values.tolist()+['distance_start_codon'])
     dtypes=dict()
     for feature in X_df.columns.values:
@@ -457,7 +488,8 @@ def main():
                     space=space,
                     algo=tpe.suggest,
                     max_evals=n_trials,
-                    trials=trials)
+                    trials=trials,
+                    rstate=np.random.default_rng(111))
         # # # # # # find the trial with lowest loss value. this is what we consider the best one
         idx = np.argmin(trials.losses())
         # # these should be the training parameters to use to achieve the best score in best trial
@@ -474,25 +506,6 @@ def main():
         
     open(output_file_name + '/log.txt','a').write("Estimator:"+str(estimator)+"\n")
     
-    #preprocess for testing Pasteur model
-    pasteur_test = training_df[(training_df['gene_essentiality']==1)&(training_df['coding_strand']==1)&(training_df['intergenic']==0)]
-    pasteur_test=pasteur_test.dropna().reset_index(drop=True)
-    for i in list(set(pasteur_test['geneid'])):
-        p_gene=pasteur_test[pasteur_test['geneid']==i]
-        for d in list(set(p_gene['dataset'])):
-            p_dataset=p_gene[p_gene['dataset']==d]
-            for j in p_dataset.index:
-                pasteur_test.at[j,'Nr_guide']=p_dataset.shape[0]
-    pasteur_test=pasteur_test[pasteur_test['Nr_guide']>=5]
-    import statistics
-    for dataset in range(len(datasets)):
-        test_data=pasteur_test[pasteur_test['dataset']==dataset]
-        for i in list(set(test_data['geneid'])):
-            gene_df=test_data[test_data['geneid']==i]
-            for j in gene_df.index:
-                pasteur_test.at[j,'median']=statistics.median(gene_df['log2FC'])
-                pasteur_test.at[j,'guideid']=int(pasteur_test['geneid'][j][1:])
-                pasteur_test.at[j,'activity_score']=statistics.median(gene_df['log2FC'])-pasteur_test['log2FC'][j]
     #k-fold cross validation
     iteration_predictions=defaultdict(list)
     kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
@@ -509,40 +522,19 @@ def main():
         else:
             train['training']=[1]*train.shape[0]
         X_train=train[train['training']==1] #only used
-        if choice=='pasteur':
-            training_seq,guides_index=find_target(X_train)
-            training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
-            training_seq=training_seq.reshape(training_seq.shape[0],-1)
-            X_train=X_train.loc[guides_index]
-        
-        
         y_train=np.array(X_train['activity'])
-        
-        if choice=='pasteur':
-            X_train=training_seq
-        else:
-            X_train=np.array(X_train[headers])
+        X_train=np.array(X_train[headers])
         
         test = X_df[X_df['guideid'].isin(test_index)]
-        if choice=='pasteur':
-            training_seq,guides_index=find_target(test)
-            training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
-            training_seq=training_seq.reshape(training_seq.shape[0],-1)
-            test=test.loc[guides_index]
-        
         y_test=np.array(test['activity'])
         log2FC_test = np.array( test['log2FC'])
+        X_test=np.array(test[headers])
         
         if choice=='pasteur':
-            X_test=training_seq
-        else:
-            X_test=np.array(test[headers])
-        
-        estimator = estimator.fit(X_train,y_train)
-        
-        if choice=='pasteur':
+            estimator = estimator.fit(np.array(X_train),y_train)
             predictions = estimator.predict(X_test).reshape(-1, 1).ravel()
         else:
+            estimator = estimator.fit(X_train,y_train)
             predictions = estimator.predict(X_test)
         
         iteration+=1
@@ -554,14 +546,12 @@ def main():
         
         
         #Pasteur method test on our test set
-        pasteur=pasteur_test[(pasteur_test['guideid'].isin(test_index))]
-        test_data=pasteur
-        training_seq,guides_index=find_target(test_data)
+        training_seq,guides_index=find_target(test)
         training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
         training_seq=training_seq.reshape(training_seq.shape[0],-1)
-        test_data=test_data.loc[guides_index]
+        # test_data=test.loc[guides_index]
         reg=pickle.load(open('Pasteur_model.pkl','rb'))
-        test_data['pasteur_score']=reg.predict(training_seq).reshape(-1, 1).ravel()
+        # test_data['pasteur_score']=reg.predict(training_seq).reshape(-1, 1).ravel()
         iteration_predictions['pasteur_score'].append(list(reg.predict(training_seq).reshape(-1, 1).ravel()))
 
     iteration_predictions=pandas.DataFrame.from_dict(iteration_predictions)
@@ -587,14 +577,7 @@ def main():
     else:
         X_all['training']=[1]*X_all.shape[0]
     X_all=X_all[X_all['training']==1]
-    if choice=='pasteur':
-        training_seq,guides_index=find_target(X_all)
-        training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
-        training_seq=training_seq.reshape(training_seq.shape[0],-1)
-        X_all=X_all.loc[guides_index]
-        estimator.fit(training_seq,np.array(X_all['activity']))
-    else:
-        estimator.fit(np.array(X_all[headers]),np.array(X_all['activity']))
+    estimator.fit(np.array(X_all[headers]),np.array(X_all['activity']))
     os.mkdir(output_file_name+'/saved_model')
     filename = output_file_name+'/saved_model/CRISPRi_model.sav'
     pickle.dump(estimator, open(filename, 'wb')) 
@@ -627,8 +610,9 @@ def main():
     
     print(time.asctime(),'Start model interpretation...')
     ### model validation with validation dataset
-    if choice =='lasso':
+    if choice =='lasso' or choice=='pasteur':
         coef=pandas.DataFrame(data={'coef':estimator.coef_,'feature':headers})
+        coef.to_csv(output_file_name+'/coef.csv',sep='\t',index=False)
         coef=coef.sort_values(by='coef',ascending=False)
         coef=coef[:15]
         pal = sns.color_palette('pastel')
