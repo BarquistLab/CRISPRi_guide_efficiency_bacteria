@@ -738,7 +738,7 @@ coef=pandas.DataFrame(mrf_lgbm.trained_b,index=mrf_lgbm.trained_b.index)
 coef.columns=gene_features
 train_re = train.groupby("clusters").mean()
 train_re=train_re.loc[coef.index]
-Z_train_re=np.array(train_re[gene_features])
+Z_train_re=np.array(scaler.transform(train_re[gene_features]))
 pred=np.sum(coef * Z_train_re,axis=1)
 for i in pred.index:
     train_gene=train[train['clusters']==i]
