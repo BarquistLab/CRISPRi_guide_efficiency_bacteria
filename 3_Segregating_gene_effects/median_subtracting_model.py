@@ -510,6 +510,7 @@ def main():
     iteration_predictions=defaultdict(list)
     kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
     print(time.asctime(),'Start 10-fold CV...')
+    os.mkdir(output_file_name+'/saved_model')
     iteration=0
     for train_index, test_index in kf.split(guideid_set):##split the combined training set into train and test based on guideid
         train_index = np.array(guideid_set)[train_index]
@@ -536,6 +537,8 @@ def main():
         else:
             estimator = estimator.fit(X_train,y_train)
             predictions = estimator.predict(X_test)
+        filename = output_file_name+'/saved_model/model_%s.sav'%iteration
+        pickle.dump(estimator, open(filename, 'wb'))
         
         iteration+=1
         iteration_predictions['log2FC'].append(list(log2FC_test))
@@ -578,7 +581,7 @@ def main():
         X_all['training']=[1]*X_all.shape[0]
     X_all=X_all[X_all['training']==1]
     estimator.fit(np.array(X_all[headers]),np.array(X_all['activity']))
-    os.mkdir(output_file_name+'/saved_model')
+    
     filename = output_file_name+'/saved_model/CRISPRi_model.sav'
     pickle.dump(estimator, open(filename, 'wb')) 
     filename = output_file_name+'/saved_model/CRISPRi_headers.sav'

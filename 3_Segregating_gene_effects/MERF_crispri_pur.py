@@ -20,7 +20,6 @@ import logging
 import pickle
 import statistics
 import warnings
-from sklearn.preprocessing import StandardScaler
 warnings.filterwarnings('ignore')
 mpl.rcParams['figure.dpi'] = 300
 import time
@@ -38,7 +37,7 @@ This is used to separate gene and guide effects using MERF (tested version 1.0).
 
 Example: python MERF_crispri.py -training 0,1,2
                   """)
-parser.add_argument("-training", type=str, default='0,1,2', 
+parser.add_argument("-training", type=str, default='0', 
                     help="""
 Which datasets to use: 
     0: E75 Rousset
@@ -48,7 +47,7 @@ Which datasets to use:
     0,2: E75 Rousset & Wang
     1,2: E18 Cui & Wang
     0,1,2: all 3 datasets
-default: 0,1,2""")
+default: 0""")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
 parser.add_argument("-c", "--choice", default="", help="If train on simplified random-effect model with CAI values, -c CAI; or use feature set from the Pasteur model -c pasteur. default: None")
 parser.add_argument("-s", "--split", default='gene', help="train-test split stratege. gene/gene_dropdistance. guide_dropdistance: To test the models without distance associated features. default: gene")
@@ -98,9 +97,9 @@ except:
         sys.exit()
 open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
 open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)    
-datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
-training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
-
+datasets=["/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/result/figure3/pur_gRNAs_training.csv"]
+# training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
+training_set_list={tuple([0]):"Purine genes"}
 logging_file= output_file_name+"/log.txt"
 for handler in logging.root.handlers[:]:
     logging.root.removeHandler(handler)
@@ -155,17 +154,16 @@ def encode_seqarr(seq,r):
 
 def DataFrame_input(df):
     ###keep guides for essential genes
-    df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==1)] #
-    df=df.dropna()
-    logging.info("Number of guides for essential genes: %s \n" % df.shape[0])
+    # df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==1)] #
+    df=df.dropna(subset=['OD1_edgeR.batch'])
+    logging.info("Number of guides: %s \n" % df.shape[0])
     for dataset in range(len(set(df['dataset']))):
         dataset_df=df[df['dataset']==dataset]
         for i in list(set(dataset_df['geneid'])):
             gene_df=dataset_df[dataset_df['geneid']==i]
-            median=statistics.median(gene_df['log2FC'])
+            median=statistics.median(gene_df['OD1_edgeR.batch'])
             for j in gene_df.index:
                 df.at[j,'median']=median
-                df.at[j,'std']=np.std(gene_df['log2FC'])
                 df.at[j,'nr_guides']=gene_df.shape[0]
     if 'CAI' in choice:
         cai=pandas.read_csv('NC_000913.3_CAI_values.csv',sep='\t',index_col=0)
@@ -214,7 +212,7 @@ def DataFrame_input(df):
     medians=np.array(df['median'])
     # cols=np.array(df['dataset'])
     #drop features
-    y=np.array(df['log2FC'],dtype=float)
+    y=np.array(df['OD1_edgeR.batch'],dtype=float)
     
     if feature_set=='pasteur':
         nts=["A","T","G","C"]
@@ -231,9 +229,11 @@ def DataFrame_input(df):
                 guide_features.append('plus_%s_%s'%(i+1,nts[j]))
         X_guide=pandas.DataFrame(data=training_seq,columns=guide_features)
         
-    drop_features=['std','nr_guides','median','guideid','log2FC',"intergenic","No.","genename","coding_strand",'geneid',
-                   "gene_biotype","gene_strand","gene_5","gene_3","genome_pos_5_end","genome_pos_3_end","guide_strand",
-                   'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
+    drop_features=['std','nr_guides','median','guideid','log2FC',"intergenic","No.","gene_name","coding_strand",'geneid',
+                   "biotype","gene_strand","gene_5","gene_3","genome_pos_5_end","genome_pos_3_end","guide_strand",
+                   'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70',
+                   'start','end','seq_60nt','dataset','genome_pos',
+                   'pasteur_score', 'OD02_edgeR.batch', 'OD06_edgeR.batch', 'OD1_edgeR.batch', 'Doench_score(with aa)', 'Doench_score(without aa)', 'DeepSpCas9', 'TUSCAN', 'SSC']
     if 'CAI' in choice:
         drop_features=drop_features+["distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_expression_min","gene_expression_max"]
     if split=='gene_dropdistance':
@@ -278,7 +278,6 @@ def DataFrame_input(df):
             for dint in dinucleotides:
                 guide_features.append(dint+str(i+1)+str(i+2))
         X_guide=pandas.DataFrame(data=X_guide,columns=guide_features)
-        
     elif "no_dinu" in feature_set:
         guide_features=[item for item in headers if item not in gene_fea]
         X_guide=np.c_[X[guide_features],sequence_encoded] #
@@ -301,21 +300,10 @@ def DataFrame_input(df):
 
 #data fusion
 labels= ['E75 Rousset','E18 Cui','Wang'] #
-rousset=pandas.read_csv(datasets[0],sep="\t")
-rousset['dataset']=[0]*rousset.shape[0]
-rousset = rousset.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-rousset18=pandas.read_csv(datasets[1],sep="\t")
-rousset18['dataset']=[1]*rousset18.shape[0]
-rousset18 = rousset18.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-wang=pandas.read_csv(datasets[2],sep="\t")
-wang['dataset']=[2]*wang.shape[0]
-wang = wang.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-combined = rousset.append(rousset18,ignore_index=True)
-combined = combined.append(wang,ignore_index=True)
+combined=pandas.read_csv(datasets[0],sep="\t")
+combined['dataset']=[0]*combined.shape[0]
 combined = combined.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
-open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n"% (datasets[0],rousset.shape[0]))
-open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[1],rousset18.shape[0]))
-open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],wang.shape[0]))
+open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n"% (datasets[0],combined.shape[0]))
 open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
 
 X_gene,X_guide, y, gene_features,guide_features,guideids,clusters,medians=DataFrame_input(combined)
@@ -361,33 +349,20 @@ elif model=='hyperopt':
             guide_train = np.array(guideid_set)[train_index]
             test_index = np.array(guideid_set)[test_index]
            
-            guide_train, guide_val = sklearn.model_selection.train_test_split(guide_train, test_size=test_size,random_state=np.random.seed(111))  
-           
             train = X_df[X_df['guideid'].isin(guide_train)]
-            train=train[train['dataset'].isin(training_sets)]
             y_train=train['log2FC']
             X_train=train[guide_features]
             Z_train=train[gene_features]
             clusters_train=train['clusters']
             
-            val = X_df[X_df['guideid'].isin(guide_val)]
-            val=val[val['dataset'].isin(training_sets)]
-            y_val=val['log2FC']
-            X_val=val[guide_features]
-            Z_val=val[gene_features]
-            clusters_val=val['clusters']
-            
-            scaler=StandardScaler()
-            Z_train=scaler.fit_transform(Z_train)
-            Z_val=scaler.transform(Z_val)
             ### keep the same test from 3 datasets
             test = X_df[X_df['guideid'].isin(test_index)]
             y_test=test['log2FC']
             X_test=test[guide_features]
             clusters_test=test['clusters']
             mrf_lgbm = MERF(estimator,max_iterations=10)
-
-            mrf_lgbm.fit(X_train, Z_train, clusters_train, y_train,X_val, Z_val, clusters_val, y_val)            
+            mrf_lgbm.fit(X_train, Z_train,clusters_train, y_train)
+            
             # estimator.fit(X_train,y_train)
             d=defaultdict(list)
             d['log2FC']+=list(y_test)
@@ -447,27 +422,27 @@ open( output_file_name+ '/log.txt','a').write("Estimator:"+str(estimator)+"\n\n\
 
 if os.path.isdir(output_file_name+'/saved_model')==False:  
     os.mkdir(output_file_name+'/saved_model')
-'''
+
 print(time.asctime(),'Start 10-fold CV...')    
 evaluations=defaultdict(list)
 iteration_predictions=defaultdict(list)
 kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
 iteration=0
-
+from sklearn.preprocessing import StandardScaler
 for train_index, test_index in kf.split(guideid_set):##split the combined training set into train and test based on guideid
     guide_train = np.array(guideid_set)[train_index]
     test_index = np.array(guideid_set)[test_index]
     guide_train, guide_val = sklearn.model_selection.train_test_split(guide_train, test_size=test_size,random_state=np.random.seed(111))  
    
     train = X_df[X_df['guideid'].isin(guide_train)]
-    train=train[train['dataset'].isin(training_sets)]
+    # train=train[train['dataset'].isin(training_sets)]
     y_train=train['log2FC']
     X_train=train[guide_features]
     Z_train=train[gene_features]
     clusters_train=train['clusters']
     
     val = X_df[X_df['guideid'].isin(guide_val)]
-    val=val[val['dataset'].isin(training_sets)]
+    # val=val[val['dataset'].isin(training_sets)]
     y_val=val['log2FC']
     X_val=val[guide_features]
     Z_val=val[gene_features]
@@ -499,7 +474,7 @@ for train_index, test_index in kf.split(guideid_set):##split the combined traini
     else:   
         iteration_predictions['pred'].append(list(mrf_lgbm.trained_fe_model.predict(X_test)))
     iteration_predictions['iteration'].append(iteration)
-    iteration_predictions['dataset'].append(list(test['dataset']))
+    # iteration_predictions['dataset'].append(list(test['dataset']))
     iteration_predictions['clusters'].append(list(test['clusters']))
     
 evaluations=pandas.DataFrame.from_dict(evaluations)
@@ -517,21 +492,17 @@ for i in list(df.index):
     d['log2FC']+=list(df['log2FC'][i])
     d['pred']+=list(df['pred'][i])
     d['clusters']+=list(df['clusters'][i])
-    d['dataset']+=list(df['dataset'][i])
+    # d['dataset']+=list(df['dataset'][i])
     D=pandas.DataFrame.from_dict(d)
-    for k in range(3):
-        D_dataset=D[D['dataset']==k]
-        for j in list(set(D_dataset['clusters'])):
-            D_gene=D_dataset[D_dataset['clusters']==j]
-            sr,_=spearmanr(D_gene['log2FC'],D_gene['pred']) 
-            plot['sr'].append(sr)
-            plot['dataset'].append(k)
+    # for k in range(3):
+        # D_dataset=D[D['dataset']==k]
+    for j in list(set(D['clusters'])):
+        D_gene=D[D['clusters']==j]
+        sr,_=spearmanr(D_gene['log2FC'],D_gene['pred']) 
+        plot['sr'].append(sr)
 plot=pandas.DataFrame.from_dict(plot)
-for k in range(3):
-    p=plot[plot['dataset']==k]
-    open(output_file_name + '/log.txt','a').write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
 open(output_file_name + '/log.txt','a').write("Mixed 3 datasets (median/mean): %s / %s \n\n\n" % (np.nanmedian(plot['sr']),np.nanmean(plot['sr'])))
-'''
+
 print(time.asctime(),'Start saving model...')    
 #save model trained with all guides
 filename = output_file_name+'/saved_model/CRISPRi_headers.sav'
@@ -539,30 +510,10 @@ pickle.dump(guide_features, open(filename, 'wb'))
 filename = output_file_name+'/saved_model/Merf_model.sav'
 mrf_lgbm = MERF(estimator,max_iterations=15)
 
-X_all=X_df[X_df['dataset'].isin(training_sets)][guide_features]
-# Z_all=X_df[X_df['dataset'].isin(training_sets)][gene_features]
+X_all=X_df[guide_features]
+Z_all=X_df[gene_features]
 
-guide_train, guide_val = sklearn.model_selection.train_test_split(guideid_set, test_size=test_size,random_state=np.random.seed(111))  
-
-train = X_df[X_df['guideid'].isin(guide_train)]
-train=train[train['dataset'].isin(training_sets)]
-y_train=train['log2FC']
-X_train=train[guide_features]
-Z_train=train[gene_features]
-clusters_train=train['clusters']
-
-val = X_df[X_df['guideid'].isin(guide_val)]
-val=val[val['dataset'].isin(training_sets)]
-y_val=val['log2FC']
-X_val=val[guide_features]
-Z_val=val[gene_features]
-clusters_val=val['clusters']
-
-
-scaler=StandardScaler()
-Z_train=scaler.fit_transform(Z_train)
-Z_val=scaler.transform(Z_val)
-mrf_lgbm.fit(X_train, Z_train, clusters_train, y_train,X_val, Z_val, clusters_val, y_val)
+mrf_lgbm.fit(X_all, Z_all, X_df['clusters'], X_df['log2FC'])
 pickle.dump(mrf_lgbm, open(filename, 'wb'))
 filename = output_file_name+'/saved_model/CRISPRi_model.sav'
 pickle.dump(mrf_lgbm.trained_fe_model, open(filename, 'wb')) 
@@ -689,14 +640,12 @@ for pair in pairs:
 guide_train, guide_test = sklearn.model_selection.train_test_split(guideid_set, test_size=test_size,random_state=np.random.seed(111))  
 guide_train, guide_val = sklearn.model_selection.train_test_split(guide_train, test_size=test_size,random_state=np.random.seed(111))  
 train = X_df[X_df['guideid'].isin(guide_train)]
-train=train[train['dataset'].isin(training_sets)]
 y_train=train['log2FC']
 X_train=train[guide_features]
 Z_train=train[gene_features]
 clusters_train=train['clusters']
 
 val = X_df[X_df['guideid'].isin(guide_val)]
-val=val[val['dataset'].isin(training_sets)]
 y_val=val['log2FC']
 X_val=val[guide_features]
 Z_val=val[gene_features]
@@ -708,10 +657,6 @@ X_test=test[guide_features]
 Z_test=test[gene_features]
 clusters_test=test['clusters']
 
-scaler=StandardScaler()
-Z_train=scaler.fit_transform(Z_train)
-Z_val=scaler.transform(Z_val)
-Z_test=scaler.transform(Z_test)
 if choice=='pasteur':
     training_seq=find_target(train)
     training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
@@ -787,7 +732,7 @@ markers=['x','D','s']
 sns.set_palette('Set2',len(set(training_sets)))
 plt.figure()
 for data in training_sets:
-    test_dataset=test[test['dataset']==data]
+    test_dataset=test
     ax=sns.scatterplot(test_dataset['log2FC'],test_dataset['pred'],label=labels[data],marker=markers[data],alpha=0.5,edgecolors='white')
     plt.text(0.65,0.10-data*0.05,labels[data]+" Spearman R: {0}".format(round(spearmanr(test_dataset['log2FC'],test_dataset['pred'])[0],3)),transform=ax.transAxes,fontsize='x-small')
 plt.legend()
@@ -803,7 +748,7 @@ labels= ['E75 Rousset','E18 Cui','Wang']
 sns.set_style("whitegrid")
 plt.figure()
 for data in training_sets:
-    median_dataset=train[train['dataset']==data]
+    median_dataset=train
     median_dataset=median_dataset.groupby('clusters').mean()
     ax=sns.scatterplot(median_dataset['median'],median_dataset['gene_pred'],label=labels[data],alpha=0.5,edgecolors='white')
     plt.text(0.55,0.15-data*0.05,labels[data]+" Spearman R: {0}".format(round(spearmanr(median_dataset['median'],median_dataset['gene_pred'])[0],3)),transform=ax.transAxes,fontsize='small')
@@ -817,7 +762,7 @@ plt.close()
 
 plt.figure()
 for data in training_sets:
-    train_dataset=train[train['dataset']==data]
+    train_dataset=train
     X_dataset=train_dataset[guide_features]
     ax=sns.scatterplot(train_dataset['log2FC']-train_dataset['gene_pred'],mrf_lgbm.trained_fe_model.predict(X_dataset),label=labels[data],alpha=0.5)
     plt.text(0.55,0.15-data*0.05,labels[data]+" Spearman R: {0}".format(round(spearmanr(train_dataset['log2FC']-train_dataset['gene_pred'],mrf_lgbm.trained_fe_model.predict(train_dataset[guide_features]))[0],3)),transform=ax.transAxes,fontsize='small')
