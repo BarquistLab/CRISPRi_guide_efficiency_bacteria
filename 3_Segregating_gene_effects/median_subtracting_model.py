@@ -434,7 +434,7 @@ def main():
     
     X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,guideids,dataset_col,sequences,geneids,genome_pos_5_ends,genome_pos_3_ends],
                                    columns=headers+['activity','log2FC','guideid','dataset','sequence','geneid',"genome_pos_5_end","genome_pos_3_end"])
-    if split=='gene_dropdistance' or feature_set=='pasteur':
+    if split=='gene_dropdistance' or feature_set=='pasteur' or 'drop_distance' in feature_set:
         X_df=pandas.DataFrame(data=np.c_[X_df,distance_start_codons],columns=X_df.columns.values.tolist()+['distance_start_codon'])
     dtypes=dict()
     for feature in X_df.columns.values:
@@ -453,6 +453,15 @@ def main():
                         min_samples_leaf=18, min_samples_split=16,
                         min_weight_fraction_leaf=0.0, n_estimators=512, n_jobs=1,
                         verbose=0, warm_start=False,random_state = np.random.seed(111))
+        if feature_set=='drop_distance_no_dinu':
+            estimator=RandomForestRegressor(bootstrap=True, ccp_alpha=0.0, criterion='friedman_mse',
+                      max_depth=24, max_features=0.13746245730059561,
+                      max_leaf_nodes=None, max_samples=None,
+                      min_impurity_decrease=0.0, min_impurity_split=None,
+                      min_samples_leaf=9, min_samples_split=10,
+                      min_weight_fraction_leaf=0.0, n_estimators=440,
+                      n_jobs=None, oob_score=False, random_state=np.random.seed(111),
+                      verbose=0, warm_start=False)
     if choice=='lasso':
         X_hyperopt=X_df[X_df['dataset'].isin(training_sets)]
         if len(training_sets)>1:

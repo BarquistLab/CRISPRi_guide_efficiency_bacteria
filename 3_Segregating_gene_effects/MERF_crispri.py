@@ -202,12 +202,15 @@ def DataFrame_input(df):
                 df.at[i,'CAI']=0
         df.at[i,'geneid']=int(df['geneid'][i][1:])
         # df.at[i,'guideid']=guide_sequence_set.index(df['sequence'][i])
-        if feature_set !='pasteur' and 'no_dinu' not in feature_set:
+        if feature_set !='pasteur' and 'no_dinu' not in feature_set and 'partial_dinu' not in feature_set:
             PAM_encoded.append(self_encode(df['PAM'][i]))
             sequence_encoded.append(self_encode(df['sequence'][i]))   
             dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
         elif "no_dinu" in feature_set:
             sequence_encoded.append(self_encode(df['sequence_30nt'][i]))   
+        elif 'partial_dinu' in feature_set:
+            sequence_encoded.append(self_encode(df['sequence_30nt'][i]))   
+            dinucleotide_encoded.append(np.concatenate((dinucleotide(df['sequence_30nt'][i][20:25]),dinucleotide(df['sequence_30nt'][i][27:30])),axis=None))
     #define guideid based on chosen split method
     guideids=np.array(list(df['geneid']))
     clusters=list(df['geneid'])
@@ -260,7 +263,7 @@ def DataFrame_input(df):
     if choice =='only_dataset':
         gene_features=['dataset']
     X_gene=X[gene_features] 
-    if feature_set !='pasteur' and 'no_dinu' not in feature_set:
+    if feature_set !='pasteur' and 'no_dinu' not in feature_set and 'partial_dinu' not in feature_set:
         # dataframe for guide features (fixed-effect model)
         guide_features=[item for item in headers if item not in gene_fea]
         X_guide=np.c_[X[guide_features],sequence_encoded,PAM_encoded,dinucleotide_encoded] #
@@ -284,11 +287,27 @@ def DataFrame_input(df):
         X_guide=np.c_[X[guide_features],sequence_encoded] #
         ###add one-hot encoded sequence features to headers
         nts=['A','T','C','G']
-        nts=['A','T','C','G']
         for i in range(30):
             for j in range(len(nts)):
                 guide_features.append('sequence_%s_%s'%(i+1,nts[j]))
         X_guide=pandas.DataFrame(data=X_guide,columns=guide_features)
+    elif 'partial_dinu' in feature_set:
+        guide_features=[item for item in headers if item not in gene_fea]
+        X_guide=np.c_[X[guide_features],sequence_encoded,dinucleotide_encoded] #
+        nts=['A','T','C','G']
+        for i in range(30):
+            for j in range(len(nts)):
+                guide_features.append('sequence_%s_%s'%(i+1,nts[j]))
+        items=list(itertools.product(nts,repeat=2))
+        dinucleotides=list(map(lambda x: x[0]+x[1],items))
+        for i in range(5-1):
+            for dint in dinucleotides:
+                guide_features.append(dint+str(i+20+1)+str(i+20+2))
+        for i in range(3-1):
+            for dint in dinucleotides:
+                guide_features.append(dint+str(i+27+1)+str(i+27+2))
+        X_guide=pandas.DataFrame(data=X_guide,columns=guide_features)
+        
         
     logging.info('Number of Guide features: %s'%len(guide_features))
     logging.info('Number of Gene features: %s'%len(gene_features))
@@ -344,7 +363,8 @@ elif model=='hyperopt':
     from hyperopt import hp, tpe, Trials
     import hyperopt
     from hyperopt.fmin import fmin    
-    space = {'n_estimators': hyperopt.hp.choice('n_estimators', np.arange(50, 500, 50)),
+    space = {'bootstrap':hp.choice('bootstrap', [True,False]),
+        'n_estimators': hyperopt.hp.choice('n_estimators', np.arange(50, 500, 10)),
              'max_features':hp.uniform('max_features', 0.0, 1.0),
               'max_depth': hp.quniform('max_depth', 2, 30, 1),
                 'min_samples_leaf': hyperopt.hp.choice('min_samples_leaf', np.arange(1, 20, 1)),
@@ -406,6 +426,53 @@ elif model=='hyperopt':
         score=np.median(scores)
         result = {"loss": score, "params": params, 'status': hyperopt.STATUS_OK}
         return result
+    def objective_mse(params):
+        int_types=['n_estimators','max_depth','min_samples_leaf','min_samples_split']
+        params = convert_int_params(int_types, params)
+        estimator=RandomForestRegressor(criterion='friedman_mse',
+                                        random_state=np.random.seed(111),**params)
+        #get the mean score of 5 folds
+        kf=sklearn.model_selection.KFold(n_splits=5, shuffle=True, random_state=np.random.seed(111))
+        scores=list()
+        for train_index, test_index in kf.split(guideid_set):##split the combined training set into train and test based on guideid
+            guide_train = np.array(guideid_set)[train_index]
+            test_index = np.array(guideid_set)[test_index]
+           
+            guide_train, guide_val = sklearn.model_selection.train_test_split(guide_train, test_size=test_size,random_state=np.random.seed(111))  
+           
+            train = X_df[X_df['guideid'].isin(guide_train)]
+            train=train[train['dataset'].isin(training_sets)]
+            y_train=train['log2FC']
+            X_train=train[guide_features]
+            Z_train=train[gene_features]
+            clusters_train=train['clusters']
+            
+            val = X_df[X_df['guideid'].isin(guide_val)]
+            val=val[val['dataset'].isin(training_sets)]
+            y_val=val['log2FC']
+            X_val=val[guide_features]
+            Z_val=val[gene_features]
+            clusters_val=val['clusters']
+            
+            scaler=StandardScaler()
+            Z_train=scaler.fit_transform(Z_train)
+            Z_val=scaler.transform(Z_val)
+            ### keep the same test from 3 datasets
+            test = X_df[X_df['guideid'].isin(test_index)]
+            y_test=test['log2FC']
+            X_test=test[guide_features]
+            clusters_test=test['clusters']
+            Z_test=test[gene_features]
+            Z_test=scaler.transform(Z_test)
+            mrf_lgbm = MERF(estimator,max_iterations=10)
+
+            mrf_lgbm.fit(X_train, Z_train, clusters_train, y_train,X_val, Z_val, clusters_val, y_val)            
+            # estimator.fit(X_train,y_train)
+            
+            scores.append(sklearn.metrics.mean_absolute_error(y_test,mrf_lgbm.predict(X_test, Z_test, clusters_test)))
+        score=np.mean(scores)
+        result = {"loss": score, "params": params, 'status': hyperopt.STATUS_OK}
+        return result
     def is_number(s):
         if s is None:
             return False
@@ -424,7 +491,7 @@ elif model=='hyperopt':
 
     n_trials = 50
     trials = Trials()
-    best = fmin(fn=objective_sklearn,
+    best = fmin(fn=objective_mse,
                 space=space,
                 algo=tpe.suggest,
                 max_evals=n_trials,
@@ -441,13 +508,13 @@ elif model=='hyperopt':
             trail_results[p].append(i["result"]['params'][p])
     trail_results=pandas.DataFrame.from_dict(trail_results)
     trail_results.to_csv(output_file_name+'/trail_results.csv',sep='\t',index=False)
-    estimator=RandomForestRegressor(bootstrap=True, criterion='friedman_mse',random_state=np.random.seed(111),**params)
+    estimator=RandomForestRegressor( criterion='friedman_mse',random_state=np.random.seed(111),**params)
     open(output_file_name + '/log.txt','a').write("Hyperopt estimated optimum {}".format(params)+"\n\n")
 open( output_file_name+ '/log.txt','a').write("Estimator:"+str(estimator)+"\n\n\n")
 
 if os.path.isdir(output_file_name+'/saved_model')==False:  
     os.mkdir(output_file_name+'/saved_model')
-'''
+
 print(time.asctime(),'Start 10-fold CV...')    
 evaluations=defaultdict(list)
 iteration_predictions=defaultdict(list)
@@ -531,7 +598,7 @@ for k in range(3):
     p=plot[plot['dataset']==k]
     open(output_file_name + '/log.txt','a').write("%s (median/mean): %s / %s \n" % (labels[k],np.nanmedian(p['sr']),np.nanmean(p['sr'])))
 open(output_file_name + '/log.txt','a').write("Mixed 3 datasets (median/mean): %s / %s \n\n\n" % (np.nanmedian(plot['sr']),np.nanmean(plot['sr'])))
-'''
+
 print(time.asctime(),'Start saving model...')    
 #save model trained with all guides
 filename = output_file_name+'/saved_model/CRISPRi_headers.sav'
