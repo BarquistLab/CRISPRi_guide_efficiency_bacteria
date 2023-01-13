@@ -21,6 +21,9 @@ from scipy.stats import spearmanr,pearsonr
 from collections import defaultdict
 import shap
 import sys
+import pickle
+import warnings
+warnings.filterwarnings('ignore')
 start_time=time.time()
 nts=['A','T','C','G']
 items=list(itertools.product(nts,repeat=2))
@@ -34,19 +37,20 @@ class MyParser(argparse.ArgumentParser):
 parser = MyParser(usage='python %(prog)s datasets [options]',formatter_class=argparse.RawTextHelpFormatter,description="""
 This is used to train optimized models from auto-sklearn with diffferent feature sets and evaluate with 10-fold cross-validation. 
 
-Example: python feature_sets.py -o test -c add_distance
+Example: python feature_sets.py -o test -c add_distance -r regressor.pkl
                   """)
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
+parser.add_argument("-r","--regressor", type=str, default=None, help="Saved regressor from autosklearn, default: None")
 parser.add_argument("-c","--choice", type=str, default='all', 
                     help="""
 Which feature sets to use: 
-    all: all 573 features
+    all: all 137 features
     only_seq: only sequence features
     add_distance: sequence and distance features
     add_MFE:sequence, distance, and MFE features
-    only_guide:all 564 guide features
+    only_guide:all 128 guide features
     gene_seq:sequence features and gene features
 default: all""")
 args = parser.parse_args()
@@ -54,7 +58,7 @@ choice=args.choice
 output_file_name = args.output
 folds=args.folds
 test_size=args.test_size
-
+regressor=args.regressor
 training_sets=[0]  ###For the results in the paper, only tested on E75 Rousset data.
 datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
@@ -80,18 +84,6 @@ def self_encode(sequence):#one-hot encoding for single nucleotide features
     sequence_one_hot_encoded = integer_encoded.flatten()
     return sequence_one_hot_encoded
 
-def dinucleotide(sequence):#encoding for dinucleotide features
-    nts=['A','T','C','G']
-    items=list(itertools.product(nts,repeat=2))
-    dinucleotides=list(map(lambda x: x[0]+x[1],items))
-    encoded=np.zeros([(len(nts)**2)*(len(sequence)-1)],dtype=np.float64)
-    for nt in range(len(sequence)-1):
-        if sequence[nt] == 'N' or sequence[nt+1] =='N':
-            print(sequence)
-            continue
-        encoded[nt*len(nts)**2+dinucleotides.index(sequence[nt]+sequence[nt+1])]=1
-    return encoded
-
 
 def DataFrame_input(df,coding_strand=1):
     ###keep guides for essential genes
@@ -115,33 +107,21 @@ def DataFrame_input(df,coding_strand=1):
     sequences=list(dict.fromkeys(df['sequence']))
     y=np.array(df['log2FC'],dtype=float)
     ### one hot encoded sequence features
-    PAM_encoded=[]
     sequence_encoded=[]
-    dinucleotide_encoded=[]
     for i in df.index:
-        PAM_encoded.append(self_encode(df['PAM'][i]))
-        sequence_encoded.append(self_encode(df['sequence'][i]))
-        dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
+        sequence_encoded.append(self_encode(df['sequence_30nt'][i]))
         df.at[i,'geneid']=int(df['geneid'][i][1:])
         df.at[i,'guideid']=sequences.index(df['sequence'][i])
-    #check if the length of gRNA and PAM from all samples is the same
-    if len(list(set(map(len,list(df['PAM'])))))==1:
-        PAM_len=int(list(set(map(len,list(df['PAM']))))[0])
-    else:
-        print("error: PAM len")
-    if len(list(set(map(len,list(df['sequence'])))))==1:   
-        sequence_len=int(list(set(map(len,list(df['sequence']))))[0])
-    else:
-        print("error: sequence len")
-    if len(list(set(map(len,list(df['sequence_30nt'])))))==1:   
-        dinucleotide_len=int(list(set(map(len,list(df['sequence_30nt']))))[0])
-    else:
-        print("error: sequence len")
     
     guideids=np.array(list(df['guideid']))
     # remove columns that are not used in training
     drop_features=['geneid','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
-                   "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
+                   "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality',
+                   'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
+    if choice=='all' or choice=='only_guide':
+        drop_features+=['CRISPRoff_score']
+    elif choice=='all_deltaGB':
+        drop_features+=['MFE_hybrid_seed','MFE_homodimer_guide','MFE_hybrid_full','MFE_monomer_guide']
     for feature in drop_features:
         try:
             df=df.drop(feature,1)
@@ -159,28 +139,20 @@ def DataFrame_input(df,coding_strand=1):
         headers=['distance_start_codon','distance_start_codon_perc']
     elif choice=='add_MFE':
         headers=['distance_start_codon','distance_start_codon_perc']+['MFE_hybrid_full','MFE_hybrid_seed','MFE_homodimer_guide','MFE_monomer_guide']
+    elif choice=='add_deltaGB':
+        headers=['distance_start_codon','distance_start_codon_perc']+['CRISPRoff_score']
     elif choice=='gene_seq':
         headers=[item for item in headers if item in gene_features]
     X=X[headers]
     ### add one-hot encoded sequence features columns
-    PAM_encoded=np.array(PAM_encoded)
     sequence_encoded=np.array(sequence_encoded)
-    dinucleotide_encoded=np.array(dinucleotide_encoded)
-    X=np.c_[X,sequence_encoded,PAM_encoded,dinucleotide_encoded]
+    X=np.c_[X,sequence_encoded]
     ###add one-hot encoded sequence features to headers
     sequence_headers=list()
-    for i in range(sequence_len):
+    for i in range(30):
         for j in range(len(nts)):
             headers.append('sequence_%s_%s'%(i+1,nts[j]))
             sequence_headers.append('sequence_%s_%s'%(i+1,nts[j]))
-    for i in range(PAM_len):
-        for j in range(len(nts)):
-            headers.append('PAM_%s_%s'%(i+1,nts[j]))
-            sequence_headers.append('PAM_%s_%s'%(i+1,nts[j]))
-    for i in range(dinucleotide_len-1):
-        for dint in dinucleotides:
-            headers.append(dint+str(i+1)+str(i+2))
-            sequence_headers.append(dint+str(i+1)+str(i+2))
     if choice=='only_seq':
         X=pandas.DataFrame(X,columns=headers)
         X=X[sequence_headers]
@@ -273,57 +245,36 @@ def main():
     X=pandas.DataFrame(data=X,columns=headers)
     X=X.astype(dtypes)
 
-    from sklearn.ensemble import RandomForestRegressor
     #optimized models from auto-sklearn
-    if  choice=='all':
-        estimator=RandomForestRegressor(bootstrap=True,criterion='friedman_mse',
-                n_estimators=512,
-                min_samples_leaf=1,
-                min_samples_split=4,
-                max_depth=None,
-                max_leaf_nodes=None,
-                max_features=0.7429459921040217,
-                min_impurity_decrease=0.0,
-                min_weight_fraction_leaf=0,
-                random_state=np.random.seed(111))
-    elif choice=='only_seq' or  choice=='only_guide':
-        estimator=RandomForestRegressor(bootstrap=True,criterion='mse',
-                n_estimators=512,
-                min_samples_leaf=3,
-                min_samples_split=12,
-                max_depth=None,
-                max_leaf_nodes=None,
-                max_features=0.9209937718223583,
-                min_impurity_decrease=0.0,
-                min_weight_fraction_leaf=0,
-                random_state=np.random.seed(111))
-    elif choice=='add_distance' or choice=='add_MFE':
-        estimator=RandomForestRegressor(bootstrap=True,criterion='mse',
-                n_estimators=512,
-                min_samples_leaf=3,
-                min_samples_split=3,
-                max_depth=None,
-                max_leaf_nodes=None,
-                max_features=0.5956294688991997,
-                min_impurity_decrease=0.0,
-                min_weight_fraction_leaf=0,
-                random_state=np.random.seed(111))
-    elif choice=='gene_seq':
-        from sklearn.experimental import enable_hist_gradient_boosting
-        from sklearn.ensemble import HistGradientBoostingRegressor
-        estimator=HistGradientBoostingRegressor(loss='least_squares',learning_rate=0.10285955822720894,
-                        max_iter=512,
-                        min_samples_leaf=1,
-                        max_depth=None,
-                        max_leaf_nodes=8,
-                        max_bins=255,
-                        l2_regularization=4.81881052684467e-05,
-                        tol=1e-07,scoring='loss',
-                        n_iter_no_change=0,
-                        validation_fraction=None,verbose=0,warm_start=False,random_state=np.random.seed(111))
+    if regressor !=None:
+        estimator=pickle.load(open(regressor,'rb'))
+        print(estimator.get_params())
+        
+        params=estimator.get_params()
+        params.update({"random_state":np.random.seed(111)})
+        if 'max_iter' in params.keys():
+            params.update({'max_iter':512})
+        if 'early_stop' in params.keys():
+            params.pop('early_stop', None)
+        if params['max_depth']=='None':
+            params['max_depth']=None
+        if params['max_leaf_nodes']=='None':
+            params['max_leaf_nodes']=None
+        
+        if 'Gradient Boosting' in str(estimator):
+            from sklearn.experimental import enable_hist_gradient_boosting
+            from sklearn.ensemble import HistGradientBoostingRegressor
+            estimator=HistGradientBoostingRegressor(**params)
+        elif 'Extra Trees' in str(estimator):
+            estimator=sklearn.ensemble.ExtraTreesRegressor(**params)
+        elif 'Random Forest' in str(estimator):
+            from sklearn.ensemble import RandomForestRegressor
+            estimator=RandomForestRegressor(**params)
+        else:
+            print(str(estimator))
+            estimator=estimator.set_params(**params)
     else:
-        print('Unknown choice. Available -c options:\nall: all 573 features\nonly_seq: only sequence features\nadd_distance: sequence and distance features\nadd_MFE:sequence, distance, and MFE features\nonly_guide:all 564 guide features\ngene_seq:sequence features and gene features')
-        print("Please input another -c option and rerun the script.")
+        print("Please include the saved regressor from auto-sklearn with option -r. ")
         print("Abort.")
         sys.exit()
     
@@ -351,8 +302,12 @@ def main():
         X_test=X_test[headers]
         X_test=X_test.astype(dtypes)
         estimator = estimator.fit(np.array(X_train,dtype=float),np.array(y_train,dtype=float))
+        
+        predictions = estimator.predict(np.array(X_train,dtype=float))
+        evaluations['Rs_train'].append(spearmanr(y_train, predictions)[0])
         predictions = estimator.predict(np.array(X_test,dtype=float))
         evaluations['Rs'].append(spearmanr(y_test, predictions)[0])
+        
         # Evaluation(output_file_name,y_test,predictions,"X_test_kfold")
         if len(datasets)>1: #evaluation in mixed and each individual dataset(s)
             X_test_1=test[headers]

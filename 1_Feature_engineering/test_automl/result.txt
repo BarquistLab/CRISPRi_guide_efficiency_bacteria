@@ -1,8 +1,0 @@
-X_test
-spearman correlation rho: 0.6275133118515802
-spearman correlation p value: 3.0238663498365767e-175
-pearson correlation rho: 0.6493029449258468
-pearson correlation p value: 1.6795482156183858e-191
-r2: 0.40952023147727723
-explained_variance_score score of X_test :0.4179699673814521
-Mean absolute error regression loss score of X_test :1.8392459709858073

@@ -21,6 +21,7 @@ import autosklearn
 import autosklearn.metrics
 import autosklearn.regression
 from scipy.stats import spearmanr,pearsonr
+from sklearn.preprocessing import StandardScaler
 import sys
 import warnings
 warnings.filterwarnings('ignore')
@@ -35,7 +36,7 @@ class MyParser(argparse.ArgumentParser):
         sys.exit(2)
         
 parser = MyParser(usage='python %(prog)s datasets [options]',formatter_class=argparse.RawTextHelpFormatter,description="""
-This is used to optimize models with individual or fused datasets using auto-sklearn (tested version 0.10.0).
+This is used to optimize models with individual or fused datasets using auto-sklearn (tested version 0.15.0).
 
 ensemble_size, folds, per_run_time_limit, time_left_for_this_task, include_estimators, and include_preprocessors are parameters for auto-sklearn. More description please check the API of auto-sklearn (https://automl.github.io/auto-sklearn/master/api.html)
 
@@ -108,27 +109,11 @@ def self_encode(sequence):#one-hot encoding for single nucleotide features
     sequence_one_hot_encoded = integer_encoded.flatten()
     return sequence_one_hot_encoded
 
-def dinucleotide(sequence):#encoding for dinucleotide features
-    nts=['A','T','C','G']
-    items=list(itertools.product(nts,repeat=2))
-    dinucleotides=list(map(lambda x: x[0]+x[1],items))
-    encoded=np.zeros([(len(nts)**2)*(len(sequence)-1)],dtype=np.float64)
-    for nt in range(len(sequence)-1):
-        if sequence[nt] == 'N' or sequence[nt+1] =='N':
-            print(sequence)
-            continue
-        encoded[nt*len(nts)**2+dinucleotides.index(sequence[nt]+sequence[nt+1])]=1
-    return encoded
-
 def DataFrame_input(df,coding_strand=1):
     ###keep guides for essential genes
     logging_file= open(output_file_name + '/log.txt','a')
     df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==coding_strand)]
     df=df.dropna()
-    # for i in list(set(list(df['geneid']))):
-    #     df_gene=df[df['geneid']==i]
-    #     for j in df_gene.index:
-    #         df.at[j,'Nr_guide']=df_gene.shape[0]
     for dataset in range(len(set(df['dataset']))):
         dataset_df=df[df['dataset']==dataset]
         for i in list(set(dataset_df['geneid'])):
@@ -141,34 +126,16 @@ def DataFrame_input(df,coding_strand=1):
     sequences=list(dict.fromkeys(df['sequence']))
     y=np.array(df['log2FC'],dtype=float)
     ### one hot encoded sequence features
-    PAM_encoded=[]
     sequence_encoded=[]
-    dinucleotide_encoded=[]
     for i in df.index:
-        PAM_encoded.append(self_encode(df['PAM'][i]))
-        sequence_encoded.append(self_encode(df['sequence'][i]))
-        dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
-        # df.at[i,'geneid']=int(df['geneid'][i][1:])
+        sequence_encoded.append(self_encode(df['sequence_30nt'][i]))
         df.at[i,'guideid']=sequences.index(df['sequence'][i])
-    #check if the length of gRNA and PAM from all samples is the same
-    if len(list(set(map(len,list(df['PAM'])))))==1:
-        PAM_len=int(list(set(map(len,list(df['PAM']))))[0])
-    else:
-        print("error: PAM len")
-    if len(list(set(map(len,list(df['sequence'])))))==1:   
-        sequence_len=int(list(set(map(len,list(df['sequence']))))[0])
-    else:
-        print("error: sequence len")
-    if len(list(set(map(len,list(df['sequence_30nt'])))))==1:   
-        dinucleotide_len=int(list(set(map(len,list(df['sequence_30nt']))))[0])
-    else:
-        print("error: sequence len")
     
     guideids=np.array(list(df['guideid']))
     # remove columns that are not used in training
     drop_features=['Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality',
-                   'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70','geneid']
+                   'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70','geneid','CRISPRoff_score','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
     for feature in drop_features:
         try:
             df=df.drop(feature,1)
@@ -184,23 +151,13 @@ def DataFrame_input(df,coding_strand=1):
     categorical_indicator=['dataset']
     feat_type=['Categorical' if headers[i] in categorical_indicator else 'Numerical' for i in range(len(headers)) ] 
     ### add one-hot encoded sequence features columns
-    PAM_encoded=np.array(PAM_encoded)
     sequence_encoded=np.array(sequence_encoded)
-    dinucleotide_encoded=np.array(dinucleotide_encoded)
-    X=np.c_[X,sequence_encoded,PAM_encoded,dinucleotide_encoded]
+    X=np.c_[X,sequence_encoded]
     ###add one-hot encoded sequence features to headers
-    for i in range(sequence_len):
+    for i in range(30):
         for j in range(len(nts)):
             headers.append('sequence_%s_%s'%(i+1,nts[j]))
-    for i in range(PAM_len):
-        for j in range(len(nts)):
-            headers.append('PAM_%s_%s'%(i+1,nts[j]))
-    for i in range(dinucleotide_len-1):
-        for dint in dinucleotides:
-            headers.append(dint+str(i+1)+str(i+2))
-    ###add one-hot encoded sequence features to feat_type
-    for i in range(PAM_len*4+sequence_len*4+(dinucleotide_len-1)*4*4):
-        feat_type.append('Categorical')
+            feat_type.append('Categorical')
     
     X=pandas.DataFrame(data=X,columns=headers)
     logging_file.write("Number of features: %s\n" % len(headers))
@@ -280,42 +237,62 @@ def main():
     X_train = X_train[headers]
     X_train=np.array(X_train,dtype=float)
     
-    
     test = X_df[X_df['guideid'].isin(guide_test)]
     y_test=np.array(test['log2FC'],dtype=float)
     X_test = test[headers]
     X_test=np.array(X_test,dtype=float)
     
     estimator = autosklearn.regression.AutoSklearnRegressor(
-            ensemble_size=ensemble_size,
+            ensemble_kwargs={"ensemble_size": ensemble_size},
             time_left_for_this_task=time_left_for_this_task,
             per_run_time_limit=per_run_time_limit,
-            include_estimators=include_estimators,
-            include_preprocessors=include_preprocessors,
+            include = {'feature_preprocessor': ["no_preprocessing"]},
+            # exclude = {'data_preprocessor':['feature_type']},
             resampling_strategy='cv',
             resampling_strategy_arguments={'folds': folds},
             tmp_folder=output_file_name+'/autosklearn_regression_example_tmp',
-            output_folder=output_file_name+'/autosklearn_regression_example_out',
             delete_tmp_folder_after_terminate=True,
-            delete_output_folder_after_terminate=True,
             disable_evaluator_output=False,
-            ensemble_memory_limit=1024, ml_memory_limit= 3072,
+            memory_limit=3072,
             ensemble_nbest=50, seed = 1,
-            exclude_estimators=None,exclude_preprocessors=None,get_smac_object_callback=None,
+            get_smac_object_callback=None,
             initial_configurations_via_metalearning=25,
             logging_config=None, metadata_directory = None,
-            n_jobs= None, smac_scenario_args= None,metric=autosklearn.metrics.mean_squared_error) #max_models_on_disc not included in version 0.5.2
+            n_jobs= None, smac_scenario_args= None,
+            metric=autosklearn.metrics.mean_squared_error,scoring_functions=[autosklearn.metrics.r2,autosklearn.metrics.mean_squared_error])
     
-    estimator.fit(X_train.copy(), y_train.copy(),feat_type=feat_type)
-    estimator.refit(X_train.copy(), y_train.copy())
-
+    estimator.fit(X=X_train.copy(), y=y_train.copy(),X_test=X_test.copy(),y_test=y_test.copy(),feat_type=feat_type)
+    # estimator.fit_ensemble(y_train.copy(), task=None, precision=32, dataset_name=None, ensemble_nbest=None, ensemble_size=ensemble_size)
+    # estimator.refit(X_train.copy(), y_train.copy())
+    
     logging_file.write("Get parameters:\n"+str(estimator.get_params())+"\n\n")
     logging_file.write("Show models: \n"+str(estimator.show_models())+"\n\n")
     logging_file.write("sprint statistics: %s \n\n"% (estimator.sprint_statistics()))
     
+    
     predictions = estimator.predict(np.array(X_test,dtype=float))
     Evaluation(output_file_name,y_test,predictions,"X_test")
+    predictions = estimator.predict(np.array(X_train,dtype=float))
+    Evaluation(output_file_name,y_train,predictions,"X_train")
     
+    
+    import pickle
+    pickle.dump(estimator, open(output_file_name+"/trained_automl.pkl", 'wb'))
+    for i, (weight, pipeline) in enumerate(estimator.get_models_with_weights()):
+        for stage_name, component in pipeline.named_steps.items():
+            print(stage_name)
+            if stage_name != "feature_preprocessor":
+                if stage_name =='data_preprocessor':
+                    pickle.dump(component, open(output_file_name+"/%s.pkl"%stage_name, 'wb'))
+                else:
+                    pickle.dump(component.choice, open(output_file_name+"/%s.pkl"%stage_name, 'wb'))
+                
+                logging_file.write("{0}:\n {1} : {2}\n".format(stage_name,component.choice,component.choice.get_params()))
+    logging_file.close()
+    
+    cv_results=estimator.cv_results_
+    cv_results=pandas.DataFrame.from_dict(cv_results)
+    cv_results.to_csv(output_file_name+'/cv_results.csv',sep='\t',index=False)
 
 if __name__ == '__main__':
     main()

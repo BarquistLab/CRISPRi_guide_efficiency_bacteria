@@ -56,20 +56,19 @@ parser.add_argument("-F", "--feature_set", default='all',type=str, help="feature
 
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
-parser.add_argument("-n","--n_estimators", type=int, default=512, help="n_estimators for random forest model, default: 512")
-parser.add_argument("-min_samples_leaf", type=int, default=18, help="min_samples_leaf for random forest model, default: 18")
-parser.add_argument("-min_samples_split", type=int, default=16, help="min_samples_split for random forest model, default: 16")
 
-parser.add_argument("-m","--model", type=str, default='autosklearn', help="random forest model for fixed-effect model, autosklearn: optimized model from auto-sklearn. hyperopt: hyperparameter tunning using hyperopt. default: autosklearn")
+parser.add_argument("-m","--model", type=str, default='hyperopt_trained', help="""
+                    tree-based model for fixed-effect model, 
+                    autosklearn_rf or autosklearn_hist: optimized model from auto-sklearn; 
+                    hyperopt: hyperparameter tunning using hyperopt.;
+                    hyperopt_trained: optimized model using hyperopt;
+                    default: hyperopt_trained""")
 args = parser.parse_args()
 training_sets=args.training
 split=args.split
 feature_set=args.feature_set
 folds=args.folds
 test_size=args.test_size
-n_estimators=args.n_estimators
-min_samples_leaf=args.min_samples_leaf
-min_samples_split=args.min_samples_split
 model=args.model
 if training_sets != None:
     if ',' in training_sets:
@@ -99,6 +98,8 @@ except:
 open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
 open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)    
 datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
+##for cluster
+# datasets=['/vol/projects/yyu/crispri/CRISPRi-guide-efficiency-in-bacteria/0_Datasets/E75_Rousset.csv','/vol/projects/yyu/crispri/CRISPRi-guide-efficiency-in-bacteria/0_Datasets/E18_Cui.csv','/vol/projects/yyu/crispri/CRISPRi-guide-efficiency-in-bacteria/0_Datasets/Wang_dataset.csv']
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
 
 logging_file= output_file_name+"/log.txt"
@@ -114,18 +115,6 @@ def self_encode(sequence):#one-hot encoding for single nucleotide features
         integer_encoded[i,nts.index(sequence[i])]=1
     sequence_one_hot_encoded = integer_encoded.flatten()
     return sequence_one_hot_encoded
-
-def dinucleotide(sequence):#encoding for dinucleotide features
-    nts=['A','T','C','G']
-    items=list(itertools.product(nts,repeat=2))
-    dinucleotides=list(map(lambda x: x[0]+x[1],items))
-    encoded=np.zeros([(len(nts)**2)*(len(sequence)-1)],dtype=np.float64)
-    for nt in range(len(sequence)-1):
-        if sequence[nt] == 'N' or sequence[nt+1] =='N':
-            print(sequence)
-            continue
-        encoded[nt*len(nts)**2+dinucleotides.index(sequence[nt]+sequence[nt+1])]=1
-    return encoded
 
 def encode(seq):
     return np.array([[int(b==p) for b in seq] for p in ["A","T","G","C"]])
@@ -165,24 +154,10 @@ def DataFrame_input(df):
             median=statistics.median(gene_df['log2FC'])
             for j in gene_df.index:
                 df.at[j,'median']=median
-                df.at[j,'std']=np.std(gene_df['log2FC'])
                 df.at[j,'nr_guides']=gene_df.shape[0]
     if 'CAI' in choice:
         cai=pandas.read_csv('NC_000913.3_CAI_values.csv',sep='\t',index_col=0)
     
-    #check if the length of gRNA and PAM from all samples is the same
-    if len(list(set(map(len,list(df['PAM'])))))==1:
-        PAM_len=int(list(set(map(len,list(df['PAM']))))[0])
-    else:
-        print("error: PAM len")
-    if len(list(set(map(len,list(df['sequence'])))))==1:   
-        sequence_len=int(list(set(map(len,list(df['sequence']))))[0])
-    else:
-        print("error: sequence len")
-    if len(list(set(map(len,list(df['sequence_30nt'])))))==1:   
-        dinucleotide_len=int(list(set(map(len,list(df['sequence_30nt']))))[0])
-    else:
-        print("error: sequence len")
     #keep only genes with more than 5 guides from each dataset
     df=df[df['nr_guides']>=5]
     logging.info("Number of guides after filtering: %s \n" % df.shape[0])
@@ -191,9 +166,7 @@ def DataFrame_input(df):
     # df['guideid']=[0]*df.shape[0]
     # clusters=[str(i)+"_"+str(j) for i,j in zip(list(df['geneid']),list(df['dataset']))] #
     ### one hot encoded sequence features
-    PAM_encoded=[]
     sequence_encoded=[]
-    dinucleotide_encoded=[]
     for i in df.index:
         if 'CAI' in choice:
             try:
@@ -202,15 +175,7 @@ def DataFrame_input(df):
                 df.at[i,'CAI']=0
         df.at[i,'geneid']=int(df['geneid'][i][1:])
         # df.at[i,'guideid']=guide_sequence_set.index(df['sequence'][i])
-        if feature_set !='pasteur' and 'no_dinu' not in feature_set and 'partial_dinu' not in feature_set:
-            PAM_encoded.append(self_encode(df['PAM'][i]))
-            sequence_encoded.append(self_encode(df['sequence'][i]))   
-            dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
-        elif "no_dinu" in feature_set:
-            sequence_encoded.append(self_encode(df['sequence_30nt'][i]))   
-        elif 'partial_dinu' in feature_set:
-            sequence_encoded.append(self_encode(df['sequence_30nt'][i]))   
-            dinucleotide_encoded.append(np.concatenate((dinucleotide(df['sequence_30nt'][i][20:25]),dinucleotide(df['sequence_30nt'][i][27:30])),axis=None))
+        sequence_encoded.append(self_encode(df['sequence_30nt'][i]))   
     #define guideid based on chosen split method
     guideids=np.array(list(df['geneid']))
     clusters=list(df['geneid'])
@@ -236,19 +201,17 @@ def DataFrame_input(df):
         
     drop_features=['std','nr_guides','median','guideid','log2FC',"intergenic","No.","genename","coding_strand",'geneid',
                    "gene_biotype","gene_strand","gene_5","gene_3","genome_pos_5_end","genome_pos_3_end","guide_strand",
-                   'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
+                   'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70',
+                   'CRISPRoff_score','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
+    if feature_set=='deltaGB':
+        drop_features=['std','nr_guides','median','guideid','log2FC',"intergenic","No.","genename","coding_strand",'geneid',
+                       "gene_biotype","gene_strand","gene_5","gene_3","genome_pos_5_end","genome_pos_3_end","guide_strand",
+                       'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70',
+                       'spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening','MFE_hybrid_seed','MFE_homodimer_guide','MFE_hybrid_full','MFE_monomer_guide']
     if 'CAI' in choice:
         drop_features=drop_features+["distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_expression_min","gene_expression_max"]
     if split=='gene_dropdistance':
         drop_features+=["distance_start_codon","distance_start_codon_perc"]
-    if 'drop_distance' in feature_set:
-        drop_features+=["distance_start_codon"]
-    if 'drop_dist_perc' in feature_set:
-        drop_features+=["distance_start_codon_perc"]
-    if 'drop_seed' in feature_set:
-        drop_features+=['MFE_hybrid_seed', 'MFE_homodimer_guide', 'MFE_monomer_guide']
-    if 'drop_full' in feature_set:
-        drop_features+=['MFE_hybrid_full', 'MFE_homodimer_guide', 'MFE_monomer_guide']
     for feature in drop_features:
         try:
             df=df.drop(feature,1)
@@ -263,26 +226,7 @@ def DataFrame_input(df):
     if choice =='only_dataset':
         gene_features=['dataset']
     X_gene=X[gene_features] 
-    if feature_set !='pasteur' and 'no_dinu' not in feature_set and 'partial_dinu' not in feature_set:
-        # dataframe for guide features (fixed-effect model)
-        guide_features=[item for item in headers if item not in gene_fea]
-        X_guide=np.c_[X[guide_features],sequence_encoded,PAM_encoded,dinucleotide_encoded] #
-        ###add one-hot encoded sequence features to headers
-        nts=['A','T','C','G']
-        for i in range(sequence_len):
-            for j in range(len(nts)):
-                guide_features.append('sequence_%s_%s'%(i+1,nts[j])) #,nts[j]
-        for i in range(PAM_len):
-            for j in range(len(nts)):
-                guide_features.append('PAM_%s_%s'%(i+1,nts[j])) #
-        items=list(itertools.product(nts,repeat=2))
-        dinucleotides=list(map(lambda x: x[0]+x[1],items))
-        for i in range(dinucleotide_len-1):
-            for dint in dinucleotides:
-                guide_features.append(dint+str(i+1)+str(i+2))
-        X_guide=pandas.DataFrame(data=X_guide,columns=guide_features)
-        
-    elif "no_dinu" in feature_set:
+    if feature_set !='pasteur':
         guide_features=[item for item in headers if item not in gene_fea]
         X_guide=np.c_[X[guide_features],sequence_encoded] #
         ###add one-hot encoded sequence features to headers
@@ -290,22 +234,6 @@ def DataFrame_input(df):
         for i in range(30):
             for j in range(len(nts)):
                 guide_features.append('sequence_%s_%s'%(i+1,nts[j]))
-        X_guide=pandas.DataFrame(data=X_guide,columns=guide_features)
-    elif 'partial_dinu' in feature_set:
-        guide_features=[item for item in headers if item not in gene_fea]
-        X_guide=np.c_[X[guide_features],sequence_encoded,dinucleotide_encoded] #
-        nts=['A','T','C','G']
-        for i in range(30):
-            for j in range(len(nts)):
-                guide_features.append('sequence_%s_%s'%(i+1,nts[j]))
-        items=list(itertools.product(nts,repeat=2))
-        dinucleotides=list(map(lambda x: x[0]+x[1],items))
-        for i in range(5-1):
-            for dint in dinucleotides:
-                guide_features.append(dint+str(i+20+1)+str(i+20+2))
-        for i in range(3-1):
-            for dint in dinucleotides:
-                guide_features.append(dint+str(i+27+1)+str(i+27+2))
         X_guide=pandas.DataFrame(data=X_guide,columns=guide_features)
         
         
@@ -351,14 +279,29 @@ for feature in X_df.columns.values:
         dtypes.update({feature:int})
 X_df=X_df.astype(dtypes)
 
-if model=='autosklearn':
+if model=='autosklearn_rf':
     #optimized RF model from auto-skelearn
-    estimator=RandomForestRegressor(bootstrap=True, criterion='friedman_mse', max_depth=None, 
-                            max_features=0.22442857329791677, max_leaf_nodes=None,
+    estimator=RandomForestRegressor(bootstrap=False, criterion='friedman_mse', max_depth=None, 
+                    max_features=0.4925913048840569, max_leaf_nodes=None,
+                    min_impurity_decrease=0.0, min_impurity_split=None,
+                    min_samples_leaf=5, min_samples_split=10,
+                    min_weight_fraction_leaf=0.0, n_estimators=512, n_jobs=1,
+                    verbose=0, warm_start=False,random_state = np.random.seed(111))
+elif model=='autosklearn_hist':  
+    from sklearn.experimental import enable_hist_gradient_boosting
+    from sklearn.ensemble import HistGradientBoostingRegressor
+    estimator=HistGradientBoostingRegressor(l2_regularization=5.997418027353535e-10,
+                              learning_rate=0.12286466971783992,
+                              max_leaf_nodes=26, min_samples_leaf=8,
+                              n_iter_no_change=0, validation_fraction=None,random_state = np.random.seed(111))
+elif model=='hyperopt_trained':
+    estimator=RandomForestRegressor(bootstrap=False, criterion='friedman_mse', max_depth=23, 
+                            max_features=0.1068891175592991, max_leaf_nodes=None,
                             min_impurity_decrease=0.0, 
-                            min_samples_leaf=min_samples_leaf, min_samples_split=min_samples_split,
-                            min_weight_fraction_leaf=0.0, n_estimators=n_estimators, n_jobs=1,
+                            min_samples_leaf=18, min_samples_split=19,
+                            min_weight_fraction_leaf=0.0, n_estimators=760, n_jobs=1,
                             verbose=0, warm_start=False,random_state = np.random.seed(111))
+
 elif model=='hyperopt':
     from hyperopt import hp, tpe, Trials
     import hyperopt
@@ -605,10 +548,7 @@ filename = output_file_name+'/saved_model/CRISPRi_headers.sav'
 pickle.dump(guide_features, open(filename, 'wb'))
 filename = output_file_name+'/saved_model/Merf_model.sav'
 mrf_lgbm = MERF(estimator,max_iterations=15)
-
 X_all=X_df[X_df['dataset'].isin(training_sets)][guide_features]
-# Z_all=X_df[X_df['dataset'].isin(training_sets)][gene_features]
-
 guide_train, guide_val = sklearn.model_selection.train_test_split(guideid_set, test_size=test_size,random_state=np.random.seed(111))  
 
 train = X_df[X_df['guideid'].isin(guide_train)]
@@ -624,7 +564,6 @@ y_val=val['log2FC']
 X_val=val[guide_features]
 Z_val=val[gene_features]
 clusters_val=val['clusters']
-
 
 scaler=StandardScaler()
 Z_train=scaler.fit_transform(Z_train)
@@ -663,7 +602,7 @@ print(time.asctime(),'Start calculating interaction values.')
 #SHAP interaction values
 shap_values = treexplainer.shap_values(X_all.iloc[:1000,:],check_additivity=False)
 shap_interaction_values=treexplainer.shap_interaction_values(X_all.iloc[:1000,:])
-# pickle.dump(shap_interaction_values, open(path+"/shap_interaction_values_all.pkl", 'wb'))
+pickle.dump(shap_interaction_values, open(output_file_name+"/shap_interaction_values_1000.pkl", 'wb'))
 open(output_file_name + '/log.txt','a').write("Done calculating SHAP interaction values: %s s\n\n"%round(time.time()-start,3))
 #mean absolute values
 tmp = np.abs(shap_interaction_values).mean(0)
@@ -720,6 +659,10 @@ for rank in tmp_1d.index[:5000]: #calculate the combination SHAP values for the 
     tmp_1d.at[rank,'expected_+/+']=f1+f2
     tmp_1d.at[rank,'expected_-/-']=f1_m+f2_m
 tmp_1d.to_csv(output_file_name+"/interaction_pair_sumSHAPvalues.csv",index=False,sep='\t')
+
+pickle.dump(shap_values, open(output_file_name+"/shap_values_1000.pkl", 'wb'))
+pickle.dump(X_index, open(output_file_name+"/X_index.pkl", 'wb'))
+
 # plots for the reported pairs 
 marker=['-','+']
 pairs=[['sequence_20_C','GC2728'],['sequence_20_G','GC2728'],['sequence_20_A','GG2728'],['GG2728','TG2526']]
@@ -897,6 +840,10 @@ plt.savefig(output_file_name+"/fixed_train.png",dpi=400)
 plt.close()
 
     
+#SHAP interaction values for all samples
+shap_values = treexplainer.shap_values(X_all,check_additivity=False)
+shap_interaction_values=treexplainer.shap_interaction_values(X_all)
+pickle.dump(shap_interaction_values, open(output_file_name+"/shap_interaction_values_all.pkl", 'wb'))
 
 print(time.asctime(),'Done.')     
 open(output_file_name + '/log.txt','a').write("Execution Time: %s seconds\n" %('{:.2f}'.format(time.time()-start)))    

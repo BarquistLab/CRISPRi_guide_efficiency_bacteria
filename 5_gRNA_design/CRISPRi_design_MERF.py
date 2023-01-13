@@ -211,25 +211,15 @@ def gRNA_search(targeting_genes):
 def self_encode(sequence):
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
     nts=['A','T','C','G']
+    N_warning=0
     for i in range(len(sequence)):
         if sequence[i] != 'N':
             integer_encoded[i,nts.index(sequence[i])]=1
-    sequence_one_hot_encoded = integer_encoded.flatten()
-    return sequence_one_hot_encoded
-
-def dinucleotide(sequence):
-    nts=['A','T','C','G']
-    items=list(itertools.product(nts,repeat=2))
-    dinucleotides=list(map(lambda x: x[0]+x[1],items))
-    encoded=np.zeros([(len(nts)**2)*(len(sequence)-1)],dtype=np.float64)
-    N_warning=0
-    for nt in range(len(sequence)-1):
-        if sequence[nt]=='N' or sequence[nt+1]=='N':
-            N_warning=1
-            continue
         else:
-            encoded[nt*len(nts)**2+dinucleotides.index(sequence[nt]+sequence[nt+1])]=1
-    return encoded,N_warning
+            N_warning=1
+    sequence_one_hot_encoded = integer_encoded.flatten()
+    return sequence_one_hot_encoded,N_warning
+
 
 def consecutive_nt_calculation(sequence):
     maxlen=0
@@ -347,30 +337,17 @@ def MachineLearning_Transform(library):
                 sequence_30nt=reference_fasta[genome_pos_3_end-7:genome_pos_5_end+4].reverse_complement()
             if len(sequence_30nt)<30:
                 sequence_30nt=sequence_30nt+"N"*(30-len(sequence_30nt))
-        PAM_encoded=self_encode(PAM)
-        sequence_encoded=self_encode(sequence)
-        dinucleotide_encoded,N_warning=dinucleotide(sequence_30nt)
+        sequence_encoded,N_warning=self_encode(sequence_30nt)
         if N_warning == 0:
             N_warning = ""
         else:
             N_warning = "N is found in extended 30nt sequence"
-        sequences=np.hstack((sequence_encoded,PAM_encoded,dinucleotide_encoded))
-        PAM_len=len(PAM)
-        sequence_len=len(sequence)
-        dinucleotide_len=len(sequence_30nt)
+        sequences=np.hstack((sequence_encoded))
         sequence_header=[]
         nts=['A','T','C','G']
-        for i in range(sequence_len):
+        for i in range(30):
             for j in range(len(nts)):
                 sequence_header.append('sequence_%s_%s'%(i+1,nts[j]))
-        for i in range(PAM_len):
-            for j in range(len(nts)):
-                sequence_header.append('PAM_%s_%s'%(i+1,nts[j]))
-        items=list(itertools.product(nts,repeat=2))
-        dinucleotides=list(map(lambda x: x[0]+x[1],items))
-        for i in range(dinucleotide_len-1):
-            for dint in dinucleotides:
-                sequence_header.append(dint+str(i+1)+str(i+2)) 
         sequence_dict=dict(zip(sequence_header,sequences))
         ### gene info and distance to start codon/operon    
         gene_length=guide['length']

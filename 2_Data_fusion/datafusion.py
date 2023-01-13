@@ -22,6 +22,7 @@ from scipy.stats import spearmanr,pearsonr
 from collections import defaultdict
 import shap
 import sys
+import pickle
 import warnings
 warnings.filterwarnings('ignore')
 start_time=time.time()
@@ -37,13 +38,13 @@ class MyParser(argparse.ArgumentParser):
 parser = MyParser(usage='python %(prog)s datasets [options]',formatter_class=argparse.RawTextHelpFormatter,description="""
 This is used to train optimized models from auto-sklearn and other model types with individual or fused datasets, and evaluate with 10-fold cross-validation. 
 
-Example: python datafusion.py -o test -c autosklearn -training 0,1,2
+Example: python datafusion.py -o test -c autosklearn -training 0,1,2 -r regressor.pkl
                   """)
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
 parser.add_argument("-s", "--split", default='guide', help="train-test split stratege. gene/guide. default: guide")
-
+parser.add_argument("-r","--regressor", type=str, default=None, help="Saved regressor from autosklearn, default: None")
 parser.add_argument("-training", type=str, default='0,1,2', 
                     help="""
 Which datasets to use: 
@@ -65,8 +66,8 @@ Which model type to run:
     svr: SVR
     histgb: Histogram-based gradient boosting
     rf: Random forest
-    lasso_hyperopt: LASSO with hyperparameters same as the MS model
-    rf_hyperopt: RF with hyperparameters same as the MS model
+    lasso_ms: LASSO with hyperparameters same as the MS model
+    rf_ms: RF with hyperparameters same as the MS model
     default: autosklearn
 """)
 
@@ -78,6 +79,7 @@ folds=args.folds
 test_size=args.test_size
 choice=args.choice
 split=args.split
+regressor=args.regressor
 datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
 
@@ -107,27 +109,12 @@ def self_encode(sequence):#one-hot encoding for single nucleotide features
     sequence_one_hot_encoded = integer_encoded.flatten()
     return sequence_one_hot_encoded
 
-def dinucleotide(sequence):#encoding for dinucleotide features
-    nts=['A','T','C','G']
-    items=list(itertools.product(nts,repeat=2))
-    dinucleotides=list(map(lambda x: x[0]+x[1],items))
-    encoded=np.zeros([(len(nts)**2)*(len(sequence)-1)],dtype=np.float64)
-    for nt in range(len(sequence)-1):
-        if sequence[nt] == 'N' or sequence[nt+1] =='N':
-            print(sequence)
-            continue
-        encoded[nt*len(nts)**2+dinucleotides.index(sequence[nt]+sequence[nt+1])]=1
-    return encoded
 
 def DataFrame_input(df,coding_strand=1):
     ###keep guides for essential genes
     logging_file= open(output_file_name + '/log.txt','a')
     df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==coding_strand)]
     df=df.dropna()
-    # for i in list(set(list(df['geneid']))):
-    #     df_gene=df[df['geneid']==i]
-    #     for j in df_gene.index:
-    #         df.at[j,'Nr_guide']=df_gene.shape[0]
     for dataset in range(len(set(df['dataset']))):
         dataset_df=df[df['dataset']==dataset]
         for i in list(set(dataset_df['geneid'])):
@@ -140,28 +127,11 @@ def DataFrame_input(df,coding_strand=1):
     sequences=list(dict.fromkeys(df['sequence']))
     y=np.array(df['log2FC'],dtype=float)
     ### one hot encoded sequence features
-    PAM_encoded=[]
     sequence_encoded=[]
-    dinucleotide_encoded=[]
     for i in df.index:
-        PAM_encoded.append(self_encode(df['PAM'][i]))
-        sequence_encoded.append(self_encode(df['sequence'][i]))
-        dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
+        sequence_encoded.append(self_encode(df['sequence_30nt'][i]))
         df.at[i,'geneid']=int(df['geneid'][i][1:])
         df.at[i,'guideid']=sequences.index(df['sequence'][i])
-    #check if the length of gRNA and PAM from all samples is the same
-    if len(list(set(map(len,list(df['PAM'])))))==1:
-        PAM_len=int(list(set(map(len,list(df['PAM']))))[0])
-    else:
-        print("error: PAM len")
-    if len(list(set(map(len,list(df['sequence'])))))==1:   
-        sequence_len=int(list(set(map(len,list(df['sequence']))))[0])
-    else:
-        print("error: sequence len")
-    if len(list(set(map(len,list(df['sequence_30nt'])))))==1:   
-        dinucleotide_len=int(list(set(map(len,list(df['sequence_30nt']))))[0])
-    else:
-        print("error: sequence len")
     if split=='guide':
         guideids=np.array(list(df['guideid']))
     elif split=='gene':
@@ -169,7 +139,9 @@ def DataFrame_input(df,coding_strand=1):
     # remove columns that are not used in training
     drop_features=['geneid','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality',
-                   'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
+                   'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70',
+                  'CRISPRoff_score','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
+    #,'MFE_hybrid_seed','MFE_homodimer_guide','MFE_hybrid_full','MFE_monomer_guide']
     for feature in drop_features:
         try:
             df=df.drop(feature,1)
@@ -179,20 +151,12 @@ def DataFrame_input(df,coding_strand=1):
     dataset_col=np.array(X['dataset'],dtype=int)  
     headers=list(X.columns.values)
     ### add one-hot encoded sequence features columns
-    PAM_encoded=np.array(PAM_encoded)
     sequence_encoded=np.array(sequence_encoded)
-    dinucleotide_encoded=np.array(dinucleotide_encoded)
-    X=np.c_[X,sequence_encoded,PAM_encoded,dinucleotide_encoded]
+    X=np.c_[X,sequence_encoded]
     ###add one-hot encoded sequence features to headers
-    for i in range(sequence_len):
+    for i in range(30):
         for j in range(len(nts)):
             headers.append('sequence_%s_%s'%(i+1,nts[j]))
-    for i in range(PAM_len):
-        for j in range(len(nts)):
-            headers.append('PAM_%s_%s'%(i+1,nts[j]))
-    for i in range(dinucleotide_len-1):
-        for dint in dinucleotides:
-            headers.append(dint+str(i+1)+str(i+2))
     
     X=pandas.DataFrame(data=X,columns=headers)
     logging_file.write("Number of features: %s\n" % len(headers))
@@ -274,7 +238,7 @@ def main():
     
     numerical_indicator=["gene_GC_content","distance_operon","distance_operon_perc","operon_downstream_genes","ess_gene_operon","gene_length","gene_expression_min","gene_expression_max",\
                           'distance_start_codon','distance_start_codon_perc','guide_GC_content','MFE_hybrid_seed','MFE_homodimer_guide','MFE_hybrid_full','MFE_monomer_guide',\
-                        'homopolymers']
+                        'homopolymers','CRISPRoff_score']
     dtypes=dict()
     for feature in headers:
         if feature not in numerical_indicator:
@@ -284,42 +248,36 @@ def main():
     
     ##optimized models from auto-sklearn
     if choice=='autosklearn':
-        from sklearn.experimental import enable_hist_gradient_boosting
-        from sklearn.ensemble import HistGradientBoostingRegressor
-        from sklearn.ensemble import RandomForestRegressor
-        if training_sets in [[0],[1],[0,1]]:
-            estimator=RandomForestRegressor(bootstrap=True,criterion='friedman_mse',
-                        n_estimators=512,
-                        min_samples_leaf=1,
-                        min_samples_split=4,
-                        max_depth=None,
-                        max_leaf_nodes=None,
-                        max_features=0.7429459921040217,
-                        min_impurity_decrease=0.0,
-                        min_weight_fraction_leaf=0,
-                        random_state=np.random.seed(111))
-        elif training_sets in [[2],[0,2],[1,2]]:
-            estimator=RandomForestRegressor(bootstrap=False,criterion='friedman_mse',
-                        n_estimators=512,
-                        min_samples_leaf=18,
-                        min_samples_split=16,
-                        max_depth=None,
-                        max_leaf_nodes=None,
-                        max_features=0.22442857329791677,
-                        min_impurity_decrease=0.0,
-                        min_weight_fraction_leaf=0,
-                        random_state=np.random.seed(111))
-        elif training_sets in [[0,1,2]]:
-            estimator=HistGradientBoostingRegressor(loss='least_squares',learning_rate=0.10285955822720894,
-                        max_iter=512,
-                        min_samples_leaf=1,
-                        max_depth=None,
-                        max_leaf_nodes=8,
-                        max_bins=255,
-                        l2_regularization=4.81881052684467e-05,
-                        tol=1e-07,scoring='loss',
-                        n_iter_no_change=0,
-                        validation_fraction=None,verbose=0,warm_start=False,random_state=np.random.seed(111))
+        if regressor !=None:
+            estimator=pickle.load(open(regressor,'rb'))
+            print(estimator.get_params())
+            
+            params=estimator.get_params()
+            params.update({"random_state":np.random.seed(111)})
+            if 'max_iter' in params.keys():
+                params.update({'max_iter':512})
+            if 'early_stop' in params.keys():
+                params.pop('early_stop', None)
+            if params['max_depth']=='None':
+                params['max_depth']=None
+            if params['max_leaf_nodes']=='None':
+                params['max_leaf_nodes']=None
+            if 'Gradient Boosting' in str(estimator):
+                from sklearn.experimental import enable_hist_gradient_boosting
+                from sklearn.ensemble import HistGradientBoostingRegressor
+                estimator=HistGradientBoostingRegressor(**params)
+            elif 'Extra Trees' in str(estimator):
+                estimator=sklearn.ensemble.ExtraTreesRegressor(**params)
+            elif 'Random Forest' in str(estimator):
+                from sklearn.ensemble import RandomForestRegressor
+                estimator=RandomForestRegressor(**params)
+            else:
+                print(str(estimator))
+                estimator=estimator.set_params(**params)
+        else:
+            print("Please include the saved regressor from auto-sklearn with option -r. ")
+            print("Abort.")
+            sys.exit()
     if choice =='lr':
         estimator= linear_model.LinearRegression()
     if choice =='lasso':
@@ -336,16 +294,16 @@ def main():
     if choice=='rf':
         from sklearn.ensemble import RandomForestRegressor
         estimator=RandomForestRegressor(random_state=np.random.seed(111))
-    if choice=='lasso_hyperopt':
-        estimator = linear_model.Lasso(alpha=0.008281527467092667,random_state = np.random.seed(111))
-    if choice=='rf_hyperopt':
+    if choice=='lasso_ms':
+        estimator = linear_model.Lasso(alpha=0.00688747788834081,random_state = np.random.seed(111))
+    if choice=='rf_ms':
         from sklearn.ensemble import RandomForestRegressor
-        estimator=RandomForestRegressor(bootstrap=True, criterion='friedman_mse', max_depth=None, 
-                        max_features=0.22442857329791677, max_leaf_nodes=None,
-                        min_impurity_decrease=0.0, min_impurity_split=None,
-                        min_samples_leaf=18, min_samples_split=16,
-                        min_weight_fraction_leaf=0.0, n_estimators=512, n_jobs=1,
-                        verbose=0, warm_start=False,random_state = np.random.seed(111))
+        estimator=RandomForestRegressor(bootstrap=False, criterion='friedman_mse', max_depth=23, 
+                                max_features=0.1068891175592991, max_leaf_nodes=None,
+                                min_impurity_decrease=0.0, 
+                                min_samples_leaf=18, min_samples_split=19,
+                                min_weight_fraction_leaf=0.0, n_estimators=760, n_jobs=1,
+                                verbose=0, warm_start=False,random_state = np.random.seed(111))
     open(output_file_name + '/log.txt','a').write("Estimator:"+str(estimator)+"\n")
     X_df=pandas.DataFrame(data=np.c_[X,y,guideids],columns=headers+['log2FC','guideid'])
     #k-fold cross validation

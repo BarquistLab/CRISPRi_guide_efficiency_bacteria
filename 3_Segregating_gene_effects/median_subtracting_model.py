@@ -96,17 +96,6 @@ def self_encode(sequence):#one-hot encoding for single nucleotide features
     sequence_one_hot_encoded = integer_encoded.flatten()
     return sequence_one_hot_encoded
 
-def dinucleotide(sequence):#encoding for dinucleotide features
-    nts=['A','T','C','G']
-    items=list(itertools.product(nts,repeat=2))
-    dinucleotides=list(map(lambda x: x[0]+x[1],items))
-    encoded=np.zeros([(len(nts)**2)*(len(sequence)-1)],dtype=np.float64)
-    for nt in range(len(sequence)-1):
-        if sequence[nt] == 'N' or sequence[nt+1] =='N':
-            print(sequence)
-            continue
-        encoded[nt*len(nts)**2+dinucleotides.index(sequence[nt]+sequence[nt+1])]=1
-    return encoded
 def encode(seq):
     return np.array([[int(b==p) for b in seq] for p in ["A","T","G","C"]])
 def find_target(df,before=20,after=20):
@@ -148,20 +137,6 @@ def DataFrame_input(df):
                 df.at[j,'activity_score']=median-df['log2FC'][j]
                 df.at[j,'Nr_guide']=gene_df.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
-    #check if the length of gRNA and PAM from all samples is the same
-    if len(list(set(map(len,list(df['PAM'])))))==1:
-        PAM_len=int(list(set(map(len,list(df['PAM']))))[0])
-    else:
-        print("error: PAM len")
-    if len(list(set(map(len,list(df['sequence'])))))==1:   
-        sequence_len=int(list(set(map(len,list(df['sequence']))))[0])
-    else:
-        print("error: sequence len")
-    if len(list(set(map(len,list(df['sequence_30nt'])))))==1:   
-        dinucleotide_len=int(list(set(map(len,list(df['sequence_30nt']))))[0])
-    else:
-        print("error: sequence len")
-        
     #keep only genes with more than 5 guides from each dataset
     df=df[df['Nr_guide']>=5]
     logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
@@ -171,24 +146,16 @@ def DataFrame_input(df):
     distance_start_codons=list(df['distance_start_codon'])
     
     ### one hot encoded sequence features
-    PAM_encoded=[]
     sequence_encoded=[]
-    dinucleotide_encoded=[]
-    # guide_sequence_set=list(dict.fromkeys(df['sequence']))
     for i in df.index:
         df.at[i,'geneid']=int(df['geneid'][i][1:])
         # df.at[i,'guideid']=guide_sequence_set.index(df['sequence'][i])
-        if feature_set !='pasteur' and 'no_dinu' not in feature_set:
-            PAM_encoded.append(self_encode(df['PAM'][i]))
-            sequence_encoded.append(self_encode(df['sequence'][i]))
-            dinucleotide_encoded.append(dinucleotide(df['sequence_30nt'][i]))
-        elif "no_dinu" in feature_set:
-            sequence_encoded.append(self_encode(df['sequence_30nt'][i]))   
+        if feature_set !='pasteur' :
+            sequence_encoded.append(self_encode(df['sequence_30nt'][i]))
     sequences=list(df['sequence'])
     #define guideid
     guideids=np.array(list(df['geneid']))
     
-    # if choice=='pasteur':
     genome_pos_5_ends=list(df['genome_pos_5_end'])
     genome_pos_3_ends=list(df['genome_pos_3_end'])
     
@@ -198,18 +165,10 @@ def DataFrame_input(df):
     if feature_set !='pasteur':
         # remove columns that are not used in training
         drop_features=['training','scaled_log2FC','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
-                       "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70']
+                       "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality',
+                       'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70','CRISPRoff_score','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
         if split=='gene_dropdistance':
             drop_features+=["distance_start_codon","distance_start_codon_perc"]#,'guide_GC_content', 'homopolymers', 'MFE_hybrid_full', 'MFE_hybrid_seed', 'MFE_homodimer_guide', 'MFE_monomer_guide']
-        if 'drop_distance' in feature_set:
-            drop_features+=["distance_start_codon"]
-        if 'drop_dist_perc' in feature_set:
-            drop_features+=["distance_start_codon_perc"]
-        if 'drop_seed' in feature_set:
-            drop_features+=['MFE_hybrid_seed', 'MFE_homodimer_guide', 'MFE_monomer_guide']
-        if 'drop_full' in feature_set:
-            drop_features+=['MFE_hybrid_full', 'MFE_homodimer_guide', 'MFE_monomer_guide']
-        
         for feature in drop_features:
             try:
                 df=df.drop(feature,1)
@@ -222,32 +181,14 @@ def DataFrame_input(df):
         guide_features=[item for item in headers if item not in features]
         X=X[guide_features]
         headers=list(X.columns.values)
-        if 'no_dinu' not in feature_set:
-            ### add one-hot encoded sequence features columns
-            PAM_encoded=np.array(PAM_encoded)
-            sequence_encoded=np.array(sequence_encoded)
-            dinucleotide_encoded=np.array(dinucleotide_encoded)
-            X=np.c_[X,sequence_encoded,PAM_encoded,dinucleotide_encoded]
-            ###add one-hot encoded sequence features to headers
-            nts=['A','T','C','G']
-            for i in range(sequence_len):
-                for j in range(len(nts)):
-                    headers.append('sequence_%s_%s'%(i+1,nts[j]))
-            for i in range(PAM_len):
-                for j in range(len(nts)):
-                    headers.append('PAM_%s_%s'%(i+1,nts[j]))
-            items=list(itertools.product(nts,repeat=2))
-            dinucleotides=list(map(lambda x: x[0]+x[1],items))
-            for i in range(dinucleotide_len-1):
-                for dint in dinucleotides:
-                    headers.append(dint+str(i+1)+str(i+2))
-        elif "no_dinu" in feature_set:
-            X=np.c_[X,sequence_encoded] #
-            ###add one-hot encoded sequence features to headers
-            nts=['A','T','C','G']
-            for i in range(30):
-                for j in range(len(nts)):
-                    headers.append('sequence_%s_%s'%(i+1,nts[j]))
+        ### add one-hot encoded sequence features columns
+        sequence_encoded=np.array(sequence_encoded)
+        X=np.c_[X,sequence_encoded]
+        ###add one-hot encoded sequence features to headers
+        nts=['A','T','C','G']
+        for i in range(30):
+            for j in range(len(nts)):
+                headers.append('sequence_%s_%s'%(i+1,nts[j]))
         X=pandas.DataFrame(data=X,columns=headers)
         
     elif feature_set=='pasteur':
@@ -447,21 +388,12 @@ def main():
     
     if choice=='rf':
         from sklearn.ensemble import RandomForestRegressor
-        estimator=RandomForestRegressor(bootstrap=True, criterion='friedman_mse', max_depth=None, 
-                        max_features=0.22442857329791677, max_leaf_nodes=None,
-                        min_impurity_decrease=0.0, min_impurity_split=None,
-                        min_samples_leaf=18, min_samples_split=16,
-                        min_weight_fraction_leaf=0.0, n_estimators=512, n_jobs=1,
-                        verbose=0, warm_start=False,random_state = np.random.seed(111))
-        if feature_set=='drop_distance_no_dinu':
-            estimator=RandomForestRegressor(bootstrap=True, ccp_alpha=0.0, criterion='friedman_mse',
-                      max_depth=24, max_features=0.13746245730059561,
-                      max_leaf_nodes=None, max_samples=None,
-                      min_impurity_decrease=0.0, min_impurity_split=None,
-                      min_samples_leaf=9, min_samples_split=10,
-                      min_weight_fraction_leaf=0.0, n_estimators=440,
-                      n_jobs=None, oob_score=False, random_state=np.random.seed(111),
-                      verbose=0, warm_start=False)
+        estimator=RandomForestRegressor(bootstrap=False, criterion='friedman_mse', max_depth=23, 
+                                max_features=0.1068891175592991, max_leaf_nodes=None,
+                                min_impurity_decrease=0.0, 
+                                min_samples_leaf=18, min_samples_split=19,
+                                min_weight_fraction_leaf=0.0, n_estimators=760, n_jobs=1,
+                                verbose=0, warm_start=False,random_state = np.random.seed(111))
     if choice=='lasso':
         X_hyperopt=X_df[X_df['dataset'].isin(training_sets)]
         if len(training_sets)>1:

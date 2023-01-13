@@ -23,6 +23,7 @@ import logging
 import argparse
 import sys
 import warnings
+import shap
 warnings.filterwarnings('ignore')
 mpl.rcParams['figure.dpi'] = 300
 
@@ -86,18 +87,6 @@ def self_encode(sequence):#one-hot encoding for single nucleotide features
     sequence_one_hot_encoded = integer_encoded.flatten()
     return sequence_one_hot_encoded
 
-def dinucleotide(sequence):#encoding for dinucleotide features
-    nts=['A','T','C','G']
-    items=list(itertools.product(nts,repeat=2))
-    dinucleotides=list(map(lambda x: x[0]+x[1],items))
-    encoded=np.zeros([(len(nts)**2)*(len(sequence)-1)],dtype=np.float64)
-    for nt in range(len(sequence)-1):
-        if sequence[nt] == 'N' or sequence[nt+1] =='N':
-            print(sequence)
-            continue
-        encoded[nt*len(nts)**2+dinucleotides.index(sequence[nt]+sequence[nt+1])]=1
-    return encoded
-
 # h2o.shutdown()
 h2o.no_progress()
 logging_file= output_file_name+"/log.txt"
@@ -129,65 +118,35 @@ open(output_file_name + '/log.txt','a').write("Total number of guides in dataset
 open(output_file_name + '/log.txt','a').write("Total number of guides in dataset %s: %s\n" % (datasets[2],wang.shape[0]))
 open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
 
-
-# for i in list(set(list(combined['geneid']))):
-#     df_gene=combined[combined['geneid']==i]
-#     for j in df_gene.index:
-#         combined.at[j,'Nr_guide']=df_gene.shape[0]
         
 for dataset in range(len(set(combined['dataset']))):
-        dataset_df=combined[combined['dataset']==dataset]
-        for i in list(set(dataset_df['geneid'])):
-            gene_df=dataset_df[dataset_df['geneid']==i]
-            for j in gene_df.index:
-                combined.at[j,'Nr_guide']=gene_df.shape[0]
+    dataset_df=combined[combined['dataset']==dataset]
+    for i in list(set(dataset_df['geneid'])):
+        gene_df=dataset_df[dataset_df['geneid']==i]
+        for j in gene_df.index:
+            combined.at[j,'Nr_guide']=gene_df.shape[0]
 open(output_file_name + '/log.txt','a').write("Number of guides for essential genes: %s \n" % combined.shape[0])
 combined=combined[combined['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
 open(output_file_name + '/log.txt','a').write("Number of guides after filtering: %s \n" % combined.shape[0])
 guide_sequence_set=list(dict.fromkeys(combined['sequence']))
 ### one hot encoded sequence features
-PAM_encoded=[]
 sequence_encoded=[]
-dinucleotide_encoded=[]
 for i in combined.index:
-    PAM_encoded.append(self_encode(combined['PAM'][i]))
-    sequence_encoded.append(self_encode(combined['sequence'][i]))   
-    dinucleotide_encoded.append(dinucleotide(combined['sequence_30nt'][i]))
-    # combined.at[i,'geneid']=int(combined['geneid'][i][1:])
+    sequence_encoded.append(self_encode(combined['sequence_30nt'][i]))   
     combined.at[i,'guideid']=guide_sequence_set.index(combined['sequence'][i])
-#check if the length of gRNA and PAM from all samples is the same
-if len(list(set(map(len,list(combined['PAM'])))))==1:
-    PAM_len=int(list(set(map(len,list(combined['PAM']))))[0])
-else:
-    print("error: PAM len")
-if len(list(set(map(len,list(combined['sequence'])))))==1:   
-    sequence_len=int(list(set(map(len,list(combined['sequence']))))[0])
-else:
-    print("error: sequence len")
-if len(list(set(map(len,list(combined['sequence_30nt'])))))==1:   
-    dinucleotide_len=int(list(set(map(len,list(combined['sequence_30nt']))))[0])
-else:
-    print("error: sequence len")
 guideids=np.array(list(combined['guideid']))
 #drop features
 X=combined.drop(['geneid','guideid',"No.","genename","gene_strand","gene_5","gene_biotype","gene_3","genome_pos_5_end","genome_pos_3_end",\
-                 'gene_essentiality','intergenic','guide_strand','coding_strand','PAM','sequence','sequence_30nt','Nr_guide','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70'],1)
+                 'gene_essentiality','intergenic','guide_strand','coding_strand','PAM','sequence','sequence_30nt','Nr_guide',\
+                 'off_target_90_100','off_target_80_90','off_target_70_80','off_target_60_70','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening','CRISPRoff_score'],1)
 features=X.columns.values.tolist()
-X=np.c_[X,sequence_encoded,PAM_encoded,dinucleotide_encoded]
+X=np.c_[X,sequence_encoded]
     
 ###add one-hot encoded sequence features to headers
 nts=['A','T','C','G']
-for i in range(sequence_len):
+for i in range(30):
     for j in range(len(nts)):
         features.append('sequence_%s_%s'%(i+1,nts[j]))
-for i in range(PAM_len):
-    for j in range(len(nts)):
-        features.append('PAM_%s_%s'%(i+1,nts[j]))
-items=list(itertools.product(nts,repeat=2))
-dinucleotides=list(map(lambda x: x[0]+x[1],items))
-for i in range(dinucleotide_len-1):
-    for dint in dinucleotides:
-        features.append(dint+str(i+1)+str(i+2))
 X=pandas.DataFrame(data=X,columns=features)
 logging.info("Number of features: %s" % len(features))
 logging.info("Features: "+",".join(features)+"\n")
@@ -316,7 +275,7 @@ cols=contributions.columns.values.tolist()
 shap_values = np.array(contributions[cols[:-1]])
 X= h2o.as_list(X, use_pandas=True)
 X=X[cols[:-1]]
-import shap
+
 shap.summary_plot(shap_values, X, plot_type="bar",show=False,color_bar=True,max_display=10)
 plt.subplots_adjust(left=0.4, top=0.95,bottom=0.2)
 plt.xticks(fontsize='medium')
