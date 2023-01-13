@@ -246,7 +246,7 @@ def main():
             ensemble_kwargs={"ensemble_size": ensemble_size},
             time_left_for_this_task=time_left_for_this_task,
             per_run_time_limit=per_run_time_limit,
-            include = {'feature_preprocessor': ["no_preprocessing"]},
+            include = {'feature_preprocessor': ["no_preprocessing"]}, #"regressor":["random_forest"]  ##
             # exclude = {'data_preprocessor':['feature_type']},
             resampling_strategy='cv',
             resampling_strategy_arguments={'folds': folds},

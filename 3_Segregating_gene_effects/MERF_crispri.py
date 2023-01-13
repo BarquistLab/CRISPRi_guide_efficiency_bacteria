@@ -307,7 +307,7 @@ elif model=='hyperopt':
     import hyperopt
     from hyperopt.fmin import fmin    
     space = {'bootstrap':hp.choice('bootstrap', [True,False]),
-        'n_estimators': hyperopt.hp.choice('n_estimators', np.arange(50, 500, 10)),
+        'n_estimators': hyperopt.hp.choice('n_estimators', np.arange(50, 1000, 10)),
              'max_features':hp.uniform('max_features', 0.0, 1.0),
               'max_depth': hp.quniform('max_depth', 2, 30, 1),
                 'min_samples_leaf': hyperopt.hp.choice('min_samples_leaf', np.arange(1, 20, 1)),
@@ -432,7 +432,7 @@ elif model=='hyperopt':
                 params[int_type] = int(raw_val)
         return params
 
-    n_trials = 50
+    n_trials = 100
     trials = Trials()
     best = fmin(fn=objective_mse,
                 space=space,

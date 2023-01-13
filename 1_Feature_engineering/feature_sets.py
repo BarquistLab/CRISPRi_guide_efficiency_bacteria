@@ -52,6 +52,8 @@ Which feature sets to use:
     add_MFE:sequence, distance, and MFE features
     only_guide:all 128 guide features
     gene_seq:sequence features and gene features
+    add_deltaGB: sequence, distance, and CRISPRoff score features
+    all_deltaGB: replacing 4 MFE features with CRISPRoff score
 default: all""")
 args = parser.parse_args()
 choice=args.choice

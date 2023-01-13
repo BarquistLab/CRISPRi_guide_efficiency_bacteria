@@ -37,6 +37,7 @@ class MyParser(argparse.ArgumentParser):
         
 parser = MyParser(usage='python %(prog)s datasets [options]',formatter_class=argparse.RawTextHelpFormatter,description="""
 This is used to train optimized models from auto-sklearn and other model types with individual or fused datasets, and evaluate with 10-fold cross-validation. 
+When autosklearn model was chosen, saved model must be provided with -r/--regressor.
 
 Example: python datafusion.py -o test -c autosklearn -training 0,1,2 -r regressor.pkl
                   """)

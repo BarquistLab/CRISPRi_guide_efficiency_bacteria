@@ -51,7 +51,7 @@ default: 0,1,2""")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
 parser.add_argument("-c", "--choice", default="rf", help="If train on random forest or LASSO or Pasteur model, rf/lasso/pasteur. default: rf")
 parser.add_argument("-s", "--split", default='gene', help="train-test split stratege. gene/gene_dropdistance. gene_dropdistance: To test the models without distance associated features. default: gene")
-parser.add_argument("-F", "--feature_set", default='all',type=str, help="feature set for training. all/pasteur. Pasteur: sequence features used for Pasteur model. default: all")
+parser.add_argument("-F", "--feature_set", default='all',type=str, help="feature set for training. all/pasteur. all: 128 guide features; pasteur: sequence features used for Pasteur model. default: all")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
 
