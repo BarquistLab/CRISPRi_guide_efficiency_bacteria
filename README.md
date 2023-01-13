@@ -72,7 +72,7 @@ All scripts were written in Python (version 3.8). To install all Python dependen
   |pandas           |       1.5.2        |
   |scipy            |       1.10.0       |
   |biopython        |       1.78         | 
-  |h2o              |       3.30.0.4     |
+  |h2o              |       3.38.0.4     |
   |pytorch          |       1.8.1        |
   |pytorch-lightning|       1.5.10       |
 
