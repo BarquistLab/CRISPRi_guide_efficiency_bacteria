@@ -108,4 +108,3 @@ make
 make install
 export PATH=$HOME/bin:$PATH		# You may want to add this to your ~/.bashrc or ~/.bash_profile
 ```
-
