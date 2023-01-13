@@ -33,7 +33,7 @@ The choice of different training dataset(s) can be specified with option **"-tra
 ### 4_Deeplearning
 
 It contains 1 Python scripts and supplementary scripts for deap learning model: 
-* median_subtracting_model_DL.py:segregating gene and guide effects using *Median subtracting method*. Either **cnn or gru** (CNN or GRU model) can be specified by "-c / --choice".
+* median_subtracting_model_DL.py:segregating gene and guide effects using *Median subtracting method*. Either **cnn or crispron** (CNN or CRISPRon model) can be specified by "-c / --choice".
 * crispri_dl: it contains the scripts that are required to run the deep learning models, such as data loading and architectures.  
 
 The choice of different training dataset(s) can be specified with option **"-training"**. 
@@ -61,18 +61,18 @@ All scripts were written in Python (version 3.8). To install all Python dependen
 
   |Name             |      Version       |           
   |-----------------|--------------------|
-  |python           |       3.8.4        | 
-  |auto-sklearn     |       0.10.0       | 
-  |scikit-learn     |       0.22.1       |
-  |shap             |       0.39.0       | 
-  |numpy            |       1.19.2       | 
+  |python           |       3.8.12       | 
+  |auto-sklearn     |       0.15.0       | 
+  |scikit-learn     |       0.24.0       |
+  |shap             |       0.39         | 
+  |numpy            |       1.20.3       | 
   |merf             |       1.0          |
   |matplotlib       |       3.5.0        |  
   |seaborn          |       0.11.2       |
-  |pandas           |       0.25.3       |
-  |scipy            |       1.6.2        |
-  |biopython        |       1.76         | 
-  |h2o              |       3.30.1.1     |
+  |pandas           |       1.5.2        |
+  |scipy            |       1.10.0       |
+  |biopython        |       1.78         | 
+  |h2o              |       3.30.0.4     |
   |pytorch          |       1.8.1        |
   |pytorch-lightning|       1.5.10       |
 
@@ -108,4 +108,3 @@ make
 make install
 export PATH=$HOME/bin:$PATH		# You may want to add this to your ~/.bashrc or ~/.bash_profile
 ```
-
