@@ -7,6 +7,7 @@ Created on Thu Aug  8 15:34:42 2019
 """
 
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import matplotlib.gridspec as gridspec
 import numpy as np
 import argparse
@@ -25,6 +26,14 @@ import pickle
 start_time=time.time()
 import warnings
 warnings.filterwarnings('ignore')
+mpl.rcParams['figure.dpi'] = 400
+mpl.rcParams['font.sans-serif']='Arial'
+mpl.rcParams['font.size']=14
+mpl.rcParams['legend.title_fontsize']=10
+mpl.rcParams['legend.fontsize']=10
+mpl.rcParams['xtick.labelsize']=12
+mpl.rcParams['ytick.labelsize']=12
+mpl.rcParams['figure.figsize']=[5,5]
 sns.set_palette('Set2')
 dataset_labels=['E75 Rousset','E18 Cui','Wang']        
 class MyParser(argparse.ArgumentParser):
@@ -322,11 +331,13 @@ def datafusion_scaling(df):
     
     slope=round(slope,6)
     intercept=round(intercept,6)
-    
+    plt.figure(figsize=(5,5))
     plt.scatter(w_overlap_log2fc,r_overlap_log2fc,color='skyblue',edgecolors='white')
     plt.plot(w_overlap_log2fc,np.array(w_overlap_log2fc)*slope+intercept,color='red')
-    plt.xlabel("logFC in Wang")
-    plt.ylabel("average logFC of E75 Rousset and E18 Cui")
+    plt.xlabel("logFC in Wang",fontsize=14)
+    plt.ylabel("average logFC of\nE75 Rousset and E18 Cui",fontsize=14)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
     plt.title("N = "+str(len(w_overlap_log2fc)))
     plt.savefig(output_file_name+'/regress_wang.svg',dpi=150)
     plt.close()
@@ -505,17 +516,25 @@ def main():
     #save models trained with all samples
     X_all=X_df[X_df['dataset'].isin(training_sets)]
     if len(training_sets)>1:
+        plt.figure(figsize=(5,5))
         for i in range(3):
             sns.distplot(X_all[X_all['dataset']==i]['activity'],label=dataset_labels[i],hist=False)
-        plt.legend()
-        plt.xlabel("Activity scores (before scaling)")
+        plt.legend(fontsize=10)
+        plt.xlabel("Activity scores (before scaling)",fontsize=14)
+        plt.ylabel("Density",fontsize=14)
+        plt.yticks(fontsize=12)
+        plt.xticks(fontsize=12)
         plt.savefig(output_file_name+"/activity_score_before.svg", dpi=150)
         plt.close()
         X_all = datafusion_scaling(X_all)
+        plt.figure(figsize=(5,5))
         for i in range(3):
             sns.distplot(X_all[X_all['dataset']==i]['activity'],label=dataset_labels[i],hist=False)
-        plt.legend()
-        plt.xlabel("Activity scores (before scaling)")
+        plt.legend(fontsize=10)
+        plt.xlabel("Activity scores (after scaling)",fontsize=14)
+        plt.ylabel("Density",fontsize=14)
+        plt.yticks(fontsize=12)
+        plt.xticks(fontsize=12)
         plt.savefig(output_file_name+"/activity_score_after.svg", dpi=150)
         plt.close()
     else:

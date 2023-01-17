@@ -61,6 +61,8 @@ parser.add_argument("-c", "--choice", default="cnn", help="If train on CNN or GR
 # parser.add_argument("-s", "--split", default='gene', help="train-test split stratege. gene. default: gene")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
+parser.add_argument("-F", "--feature_set", default='all',type=str, help="feature set for training. all/deltaGB. deltaGB: replace the MFE featurs with CRISPRoff score. default: all")
+
 
 args = parser.parse_args()
 training_sets=args.training
@@ -76,6 +78,7 @@ folds=args.folds
 test_size=args.test_size
 output_file_name=args.output
 choice=args.choice
+feature_set=args.feature_set
 try:
     os.mkdir(output_file_name)
 except:
@@ -154,6 +157,11 @@ def DataFrame_input(df):
     drop_features=['scaled_log2FC','training','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','gene_essentiality',"geneid",
                    'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70','CRISPRoff_score','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
+    if feature_set=='deltaGB':
+        drop_features=['std','nr_guides','median','guideid','log2FC',"intergenic","No.","genename","coding_strand",'geneid',
+                       "gene_biotype","gene_strand","gene_5","gene_3","genome_pos_5_end","genome_pos_3_end","guide_strand",
+                       'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70',
+                       'spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening','MFE_hybrid_seed','MFE_homodimer_guide','MFE_hybrid_full','MFE_monomer_guide']
     for feature in drop_features:
         try:
             df=df.drop(feature,1)

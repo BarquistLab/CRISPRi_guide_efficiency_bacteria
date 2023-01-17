@@ -22,7 +22,15 @@ import statistics
 import warnings
 from sklearn.preprocessing import StandardScaler
 warnings.filterwarnings('ignore')
-mpl.rcParams['figure.dpi'] = 300
+mpl.rcParams['figure.dpi'] = 400
+mpl.rcParams['font.sans-serif']='Arial'
+mpl.rcParams['font.size']=14
+mpl.rcParams['legend.title_fontsize']=10
+mpl.rcParams['legend.fontsize']=10
+mpl.rcParams['xtick.labelsize']=12
+mpl.rcParams['ytick.labelsize']=12
+mpl.rcParams['xtick.labelsize']=12
+mpl.rcParams['figure.figsize']=[5,5]
 import time
 start=time.time()
 
@@ -818,8 +826,10 @@ for data in training_sets:
     ax=sns.scatterplot(median_dataset['median'],median_dataset['gene_pred'],label=labels[data],alpha=0.5,edgecolors='white')
     plt.text(0.55,0.15-data*0.05,labels[data]+" Spearman R: {0}".format(round(spearmanr(median_dataset['median'],median_dataset['gene_pred'])[0],3)),transform=ax.transAxes,fontsize='small')
 plt.legend()
-plt.xlabel("Median")
-plt.ylabel("Predicted Random effects")   
+plt.xlabel("Median logFC of gRNAs for each gene",fontsize=14)
+plt.ylabel("Predicted Random effects",fontsize=14)   
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
 plt.title('Train')
 plt.savefig(output_file_name+"/random_median_train.svg",dpi=400)
 # plt.show()
