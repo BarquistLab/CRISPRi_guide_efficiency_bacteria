@@ -96,6 +96,7 @@ def DataFrame_input(df,coding_strand=1):
     #     df_gene=df[df['geneid']==i]
     #     for j in df_gene.index:
     #         df.at[j,'Nr_guide']=df_gene.shape[0]
+    print(len(set(df[df['dataset']==1]['geneid'])))
     for dataset in range(len(set(df['dataset']))):
         dataset_df=df[df['dataset']==dataset]
         for i in list(set(dataset_df['geneid'])):
@@ -105,7 +106,7 @@ def DataFrame_input(df,coding_strand=1):
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
     df=df[df['Nr_guide']>=5] #keep only genes with more than 5 guides from all 3 datasets
     logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
-    
+    print(len(set(df[df['dataset']==1]['geneid'])))
     sequences=list(dict.fromkeys(df['sequence']))
     y=np.array(df['log2FC'],dtype=float)
     ### one hot encoded sequence features
