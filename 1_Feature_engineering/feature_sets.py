@@ -108,6 +108,7 @@ def DataFrame_input(df,coding_strand=1):
     logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
     print(len(set(df[df['dataset']==1]['geneid'])))
     sequences=list(dict.fromkeys(df['sequence']))
+    
     y=np.array(df['log2FC'],dtype=float)
     ### one hot encoded sequence features
     sequence_encoded=[]
@@ -287,7 +288,8 @@ def main():
     #k-fold cross validation
     evaluations=defaultdict(list)
     kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
-    
+    fold=1
+    plt.figure()
     guideid_set=list(set(guideids))
     for train_index, test_index in kf.split(guideid_set):
         ##split the combined training set into train and test based on guideid
@@ -311,7 +313,9 @@ def main():
         predictions = estimator.predict(np.array(X_test,dtype=float))
         evaluations['Rs'].append(spearmanr(y_test, predictions)[0])
         
-        # Evaluation(output_file_name,y_test,predictions,"X_test_kfold")
+        sns.distplot(predictions,label='Fold %s'%fold)
+        # Evaluation(output_file_name,y_test,predictions,"X_test_fold_%s"%fold)
+        fold+=1
         if len(datasets)>1: #evaluation in mixed and each individual dataset(s)
             X_test_1=test[headers]
             y_test_1=np.array(test['log2FC'],dtype=float)
@@ -327,7 +331,13 @@ def main():
                 spearman_rho,_=spearmanr(y_test_1, predictions)
                 evaluations['Rs_test%s'%(dataset+1)].append(spearman_rho)
                 # Evaluation(output_file_name,y_test_1,predictions,"X_test_%s"%(dataset+1))
-     
+    plt.legend()
+    plt.xlabel('Predicted values',fontsize=14)
+    plt.ylabel('Density',fontsize=14)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.savefig(output_file_name+"/predicted_dist.svg")
+    plt.close()
     evaluations=pandas.DataFrame.from_dict(evaluations)
     evaluations.to_csv(output_file_name+'/iteration_scores.csv',sep='\t',index=True)
     
