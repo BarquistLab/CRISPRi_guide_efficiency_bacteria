@@ -64,7 +64,7 @@ parser.add_argument("-F", "--feature_set", default='all',type=str, help="feature
 
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
-
+parser.add_argument("-r","--random_seed", type=int, default=111, help="random seed for train-test split, default: 111")
 parser.add_argument("-m","--model", type=str, default='hyperopt_trained', help="""
                     tree-based model for fixed-effect model, 
                     autosklearn_rf or autosklearn_hist: optimized model from auto-sklearn; 
@@ -77,6 +77,7 @@ split=args.split
 feature_set=args.feature_set
 folds=args.folds
 test_size=args.test_size
+random_seed=args.random_seed
 model=args.model
 if training_sets != None:
     if ',' in training_sets:
@@ -232,7 +233,7 @@ def DataFrame_input(df):
     headers=list(X.columns.values)
     gene_features=[item for item in gene_fea if item in headers]
     if choice =='only_dataset':
-        gene_features=['dataset']
+        gene_features=['dataset','gene_GC_content','gene_length']
     X_gene=X[gene_features] 
     if feature_set !='pasteur':
         guide_features=[item for item in headers if item not in gene_fea]
@@ -469,13 +470,13 @@ if os.path.isdir(output_file_name+'/saved_model')==False:
 print(time.asctime(),'Start 10-fold CV...')    
 evaluations=defaultdict(list)
 iteration_predictions=defaultdict(list)
-kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
+kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(random_seed))
 iteration=0
 
 for train_index, test_index in kf.split(guideid_set):##split the combined training set into train and test based on guideid
     guide_train = np.array(guideid_set)[train_index]
     test_index = np.array(guideid_set)[test_index]
-    guide_train, guide_val = sklearn.model_selection.train_test_split(guide_train, test_size=test_size,random_state=np.random.seed(111))  
+    guide_train, guide_val = sklearn.model_selection.train_test_split(guide_train, test_size=test_size,random_state=np.random.seed(random_seed))  
    
     train = X_df[X_df['guideid'].isin(guide_train)]
     train=train[train['dataset'].isin(training_sets)]
@@ -509,7 +510,7 @@ for train_index, test_index in kf.split(guideid_set):##split the combined traini
     else:
         mrf_lgbm = MERF(estimator,max_iterations=15)
         mrf_lgbm.fit(X_train, Z_train, clusters_train, y_train,X_val, Z_val, clusters_val, y_val)
-        pickle.dump(mrf_lgbm, open(filename, 'wb'))
+        # pickle.dump(mrf_lgbm, open(filename, 'wb')) ## save the model from each iteration
     iteration+=1
     iteration_predictions['log2FC'].append(list(y_test))
     if feature_set=='pasteur':
@@ -557,7 +558,7 @@ pickle.dump(guide_features, open(filename, 'wb'))
 filename = output_file_name+'/saved_model/Merf_model.sav'
 mrf_lgbm = MERF(estimator,max_iterations=15)
 X_all=X_df[X_df['dataset'].isin(training_sets)][guide_features]
-guide_train, guide_val = sklearn.model_selection.train_test_split(guideid_set, test_size=test_size,random_state=np.random.seed(111))  
+guide_train, guide_val = sklearn.model_selection.train_test_split(guideid_set, test_size=test_size,random_state=np.random.seed(random_seed))  
 
 train = X_df[X_df['guideid'].isin(guide_train)]
 train=train[train['dataset'].isin(training_sets)]
@@ -605,6 +606,8 @@ for i in [10,15,30]:
     plt.xticks(fontsize='medium')
     plt.savefig(output_file_name+"/shap_value_top%s.svg"%(i),dpi=400)
     plt.close()    
+    
+###The SHAP interaction values takes a fairly long time and more RAM to run
 '''
 print(time.asctime(),'Start calculating interaction values.') 
 #SHAP interaction values
@@ -704,8 +707,8 @@ for pair in pairs:
 
 '''
 ###split again for evaluating the difference between train and test and plots
-guide_train, guide_test = sklearn.model_selection.train_test_split(guideid_set, test_size=test_size,random_state=np.random.seed(111))  
-guide_train, guide_val = sklearn.model_selection.train_test_split(guide_train, test_size=test_size,random_state=np.random.seed(111))  
+guide_train, guide_test = sklearn.model_selection.train_test_split(guideid_set, test_size=test_size,random_state=np.random.seed(random_seed))  
+guide_train, guide_val = sklearn.model_selection.train_test_split(guide_train, test_size=test_size,random_state=np.random.seed(random_seed))  
 train = X_df[X_df['guideid'].isin(guide_train)]
 train=train[train['dataset'].isin(training_sets)]
 y_train=train['log2FC']
@@ -851,9 +854,9 @@ plt.close()
 
     
 #SHAP interaction values for all samples
-shap_values = treexplainer.shap_values(X_all,check_additivity=False)
-shap_interaction_values=treexplainer.shap_interaction_values(X_all)
-pickle.dump(shap_interaction_values, open(output_file_name+"/shap_interaction_values_all.pkl", 'wb'))
+# shap_values = treexplainer.shap_values(X_all,check_additivity=False)
+# shap_interaction_values=treexplainer.shap_interaction_values(X_all)
+# pickle.dump(shap_interaction_values, open(output_file_name+"/shap_interaction_values_all.pkl", 'wb'))
 
 print(time.asctime(),'Done.')     
 open(output_file_name + '/log.txt','a').write("Execution Time: %s seconds\n" %('{:.2f}'.format(time.time()-start)))    

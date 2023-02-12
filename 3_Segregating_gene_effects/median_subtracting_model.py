@@ -63,7 +63,7 @@ parser.add_argument("-s", "--split", default='gene', help="train-test split stra
 parser.add_argument("-F", "--feature_set", default='all',type=str, help="feature set for training. all/pasteur. all: 128 guide features; pasteur: sequence features used for Pasteur model. default: all")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
-
+parser.add_argument("-r","--random_seed", type=int, default=111, help="random seed for train-test split, default: 111")
 args = parser.parse_args()
 training_sets=args.training
 if training_sets != None:
@@ -79,7 +79,7 @@ folds=args.folds
 test_size=args.test_size
 output_file_name=args.output
 choice=args.choice
-
+random_seed=args.random_seed
 
 try:
     os.mkdir(output_file_name)
@@ -460,7 +460,7 @@ def main():
     
     #k-fold cross validation
     iteration_predictions=defaultdict(list)
-    kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
+    kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(random_seed))
     print(time.asctime(),'Start 10-fold CV...')
     os.mkdir(output_file_name+'/saved_model')
     iteration=0
