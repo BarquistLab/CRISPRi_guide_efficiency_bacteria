@@ -1,0 +1,413 @@
+Python script: MERF_crispri.py
+Parsed arguments: Namespace(choice='', feature_set='all', folds=10, model='hyperopt_trained', output='test', random_seed=111, split='gene', test_size=0.2, training='0,1,2')
+
+Total number of guides in dataset ../0_Datasets/E75_Rousset.csv: 59246
+Total number of guides in dataset ../0_Datasets/E18_Cui.csv: 59246
+Total number of guides in dataset ../0_Datasets/Wang_dataset.csv: 52104
+Training dataset: all 3 datasets
+2023-02-17 12:00:23,920 - Number of guides for essential genes: 8099 
+
+2023-02-17 12:00:24,278 - Number of guides after filtering: 7400 
+
+2023-02-17 12:00:24,565 - Number of Guide features: 128
+2023-02-17 12:00:24,565 - Number of Gene features: 9
+2023-02-17 12:00:24,565 - Guide features: guide_GC_content,distance_start_codon,distance_start_codon_perc,homopolymers,MFE_hybrid_full,MFE_hybrid_seed,MFE_homodimer_guide,MFE_monomer_guide,sequence_1_A,sequence_1_T,sequence_1_C,sequence_1_G,sequence_2_A,sequence_2_T,sequence_2_C,sequence_2_G,sequence_3_A,sequence_3_T,sequence_3_C,sequence_3_G,sequence_4_A,sequence_4_T,sequence_4_C,sequence_4_G,sequence_5_A,sequence_5_T,sequence_5_C,sequence_5_G,sequence_6_A,sequence_6_T,sequence_6_C,sequence_6_G,sequence_7_A,sequence_7_T,sequence_7_C,sequence_7_G,sequence_8_A,sequence_8_T,sequence_8_C,sequence_8_G,sequence_9_A,sequence_9_T,sequence_9_C,sequence_9_G,sequence_10_A,sequence_10_T,sequence_10_C,sequence_10_G,sequence_11_A,sequence_11_T,sequence_11_C,sequence_11_G,sequence_12_A,sequence_12_T,sequence_12_C,sequence_12_G,sequence_13_A,sequence_13_T,sequence_13_C,sequence_13_G,sequence_14_A,sequence_14_T,sequence_14_C,sequence_14_G,sequence_15_A,sequence_15_T,sequence_15_C,sequence_15_G,sequence_16_A,sequence_16_T,sequence_16_C,sequence_16_G,sequence_17_A,sequence_17_T,sequence_17_C,sequence_17_G,sequence_18_A,sequence_18_T,sequence_18_C,sequence_18_G,sequence_19_A,sequence_19_T,sequence_19_C,sequence_19_G,sequence_20_A,sequence_20_T,sequence_20_C,sequence_20_G,sequence_21_A,sequence_21_T,sequence_21_C,sequence_21_G,sequence_22_A,sequence_22_T,sequence_22_C,sequence_22_G,sequence_23_A,sequence_23_T,sequence_23_C,sequence_23_G,sequence_24_A,sequence_24_T,sequence_24_C,sequence_24_G,sequence_25_A,sequence_25_T,sequence_25_C,sequence_25_G,sequence_26_A,sequence_26_T,sequence_26_C,sequence_26_G,sequence_27_A,sequence_27_T,sequence_27_C,sequence_27_G,sequence_28_A,sequence_28_T,sequence_28_C,sequence_28_G,sequence_29_A,sequence_29_T,sequence_29_C,sequence_29_G,sequence_30_A,sequence_30_T,sequence_30_C,sequence_30_G
+2023-02-17 12:00:24,565 - Gene features: dataset,gene_GC_content,distance_operon,distance_operon_perc,operon_downstream_genes,ess_gene_operon,gene_length,gene_expression_min,gene_expression_max
+Number of clusters: 301
+Done processing input: 1.956 s
+
+Estimator:RandomForestRegressor(bootstrap=False, criterion='friedman_mse', max_depth=23,
+                      max_features=0.1068891175592991, min_samples_leaf=18,
+                      min_samples_split=19, n_estimators=760, n_jobs=1)
+
+
+2023-02-17 12:00:29,729 - Training GLL is 9821.580925345033 at iteration 1.
+2023-02-17 12:00:29,891 - Validation MSE Loss is 7.6091096088383665 at iteration 1.
+2023-02-17 12:00:34,434 - Training GLL is 9904.341445970318 at iteration 2.
+2023-02-17 12:00:34,596 - Validation MSE Loss is 7.589277313848485 at iteration 2.
+2023-02-17 12:00:39,392 - Training GLL is 9926.33314506486 at iteration 3.
+2023-02-17 12:00:39,556 - Validation MSE Loss is 7.58351868162774 at iteration 3.
+2023-02-17 12:00:44,104 - Training GLL is 9928.443521033012 at iteration 4.
+2023-02-17 12:00:44,268 - Validation MSE Loss is 7.604500299437565 at iteration 4.
+2023-02-17 12:00:49,157 - Training GLL is 9925.450590847351 at iteration 5.
+2023-02-17 12:00:49,326 - Validation MSE Loss is 7.602706241761584 at iteration 5.
+2023-02-17 12:01:04,952 - Training GLL is 9924.51164378609 at iteration 6.
+2023-02-17 12:01:05,202 - Validation MSE Loss is 7.599181210793622 at iteration 6.
+2023-02-17 12:01:14,866 - Training GLL is 9915.53995661091 at iteration 7.
+2023-02-17 12:01:15,077 - Validation MSE Loss is 7.607385014235256 at iteration 7.
+2023-02-17 12:01:29,736 - Training GLL is 9915.823256857602 at iteration 8.
+2023-02-17 12:01:29,978 - Validation MSE Loss is 7.59788124323936 at iteration 8.
+2023-02-17 12:01:47,765 - Training GLL is 9910.616319282399 at iteration 9.
+2023-02-17 12:01:48,039 - Validation MSE Loss is 7.6100625247622276 at iteration 9.
+2023-02-17 12:02:03,648 - Training GLL is 9899.57167576274 at iteration 10.
+2023-02-17 12:02:03,871 - Validation MSE Loss is 7.6034887102908275 at iteration 10.
+2023-02-17 12:02:16,562 - Training GLL is 9893.071055578954 at iteration 11.
+2023-02-17 12:02:16,812 - Validation MSE Loss is 7.611292824791374 at iteration 11.
+2023-02-17 12:02:36,121 - Training GLL is 9886.102265721318 at iteration 12.
+2023-02-17 12:02:36,355 - Validation MSE Loss is 7.617138714305808 at iteration 12.
+2023-02-17 12:02:50,030 - Training GLL is 9867.29201503846 at iteration 13.
+2023-02-17 12:02:50,250 - Validation MSE Loss is 7.612411665907782 at iteration 13.
+2023-02-17 12:03:06,821 - Training GLL is 9871.316931482435 at iteration 14.
+2023-02-17 12:03:07,039 - Validation MSE Loss is 7.61743573180507 at iteration 14.
+2023-02-17 12:03:25,284 - Training GLL is 9861.988259220034 at iteration 15.
+2023-02-17 12:03:25,504 - Validation MSE Loss is 7.601054692679255 at iteration 15.
+2023-02-17 12:03:38,722 - Training GLL is 9952.215725055874 at iteration 1.
+2023-02-17 12:03:39,001 - Validation MSE Loss is 8.730657005609688 at iteration 1.
+2023-02-17 12:03:54,108 - Training GLL is 10012.246418709527 at iteration 2.
+2023-02-17 12:03:54,370 - Validation MSE Loss is 8.694852837438692 at iteration 2.
+2023-02-17 12:04:13,431 - Training GLL is 10030.754613781837 at iteration 3.
+2023-02-17 12:04:13,724 - Validation MSE Loss is 8.691842252311044 at iteration 3.
+2023-02-17 12:04:21,096 - Training GLL is 10027.242106608906 at iteration 4.
+2023-02-17 12:04:21,352 - Validation MSE Loss is 8.69453568718991 at iteration 4.
+2023-02-17 12:04:36,748 - Training GLL is 10026.693135180722 at iteration 5.
+2023-02-17 12:04:37,000 - Validation MSE Loss is 8.698680815919085 at iteration 5.
+2023-02-17 12:04:52,368 - Training GLL is 10016.226002915484 at iteration 6.
+2023-02-17 12:04:52,623 - Validation MSE Loss is 8.693420465332908 at iteration 6.
+2023-02-17 12:05:07,946 - Training GLL is 10004.679150674277 at iteration 7.
+2023-02-17 12:05:08,200 - Validation MSE Loss is 8.694852776834653 at iteration 7.
+2023-02-17 12:05:26,176 - Training GLL is 10001.845752413928 at iteration 8.
+2023-02-17 12:05:26,473 - Validation MSE Loss is 8.691464020213413 at iteration 8.
+2023-02-17 12:05:36,968 - Training GLL is 9984.469371627434 at iteration 9.
+2023-02-17 12:05:37,238 - Validation MSE Loss is 8.693367038008562 at iteration 9.
+2023-02-17 12:05:50,736 - Training GLL is 9981.794269132377 at iteration 10.
+2023-02-17 12:05:50,985 - Validation MSE Loss is 8.707828293192946 at iteration 10.
+2023-02-17 12:06:09,780 - Training GLL is 9964.692288504066 at iteration 11.
+2023-02-17 12:06:10,071 - Validation MSE Loss is 8.702411644681412 at iteration 11.
+2023-02-17 12:06:22,448 - Training GLL is 9954.916409844296 at iteration 12.
+2023-02-17 12:06:22,691 - Validation MSE Loss is 8.691639309835868 at iteration 12.
+2023-02-17 12:06:33,527 - Training GLL is 9950.189392150229 at iteration 13.
+2023-02-17 12:06:33,768 - Validation MSE Loss is 8.70683096425211 at iteration 13.
+2023-02-17 12:06:48,286 - Training GLL is 9940.080067081195 at iteration 14.
+2023-02-17 12:06:48,478 - Validation MSE Loss is 8.69549562114878 at iteration 14.
+2023-02-17 12:07:01,433 - Training GLL is 9933.825017521507 at iteration 15.
+2023-02-17 12:07:01,657 - Validation MSE Loss is 8.700294931949239 at iteration 15.
+2023-02-17 12:07:15,415 - Training GLL is 9801.839461466236 at iteration 1.
+2023-02-17 12:07:15,594 - Validation MSE Loss is 8.468199891071727 at iteration 1.
+2023-02-17 12:07:27,692 - Training GLL is 9875.727747326371 at iteration 2.
+2023-02-17 12:07:27,989 - Validation MSE Loss is 8.411620544394319 at iteration 2.
+2023-02-17 12:07:43,921 - Training GLL is 9877.938860199502 at iteration 3.
+2023-02-17 12:07:44,177 - Validation MSE Loss is 8.40779478519474 at iteration 3.
+2023-02-17 12:07:58,362 - Training GLL is 9866.025051016784 at iteration 4.
+2023-02-17 12:07:58,672 - Validation MSE Loss is 8.405928307828821 at iteration 4.
+2023-02-17 12:08:15,594 - Training GLL is 9861.12892259409 at iteration 5.
+2023-02-17 12:08:15,832 - Validation MSE Loss is 8.40668202965493 at iteration 5.
+2023-02-17 12:08:31,585 - Training GLL is 9842.925348986177 at iteration 6.
+2023-02-17 12:08:31,906 - Validation MSE Loss is 8.404531848636601 at iteration 6.
+2023-02-17 12:08:37,085 - Training GLL is 9839.669397309512 at iteration 7.
+2023-02-17 12:08:37,295 - Validation MSE Loss is 8.420341628467387 at iteration 7.
+2023-02-17 12:08:42,262 - Training GLL is 9823.065530061074 at iteration 8.
+2023-02-17 12:08:42,450 - Validation MSE Loss is 8.420372751245054 at iteration 8.
+2023-02-17 12:08:47,090 - Training GLL is 9808.234959812638 at iteration 9.
+2023-02-17 12:08:47,252 - Validation MSE Loss is 8.412543946303057 at iteration 9.
+2023-02-17 12:08:52,033 - Training GLL is 9796.001753341916 at iteration 10.
+2023-02-17 12:08:52,195 - Validation MSE Loss is 8.417670887949688 at iteration 10.
+2023-02-17 12:08:56,861 - Training GLL is 9788.875406931453 at iteration 11.
+2023-02-17 12:08:57,025 - Validation MSE Loss is 8.425048328032851 at iteration 11.
+2023-02-17 12:09:01,724 - Training GLL is 9775.007801103124 at iteration 12.
+2023-02-17 12:09:01,887 - Validation MSE Loss is 8.424457956859872 at iteration 12.
+2023-02-17 12:09:06,676 - Training GLL is 9762.790205164385 at iteration 13.
+2023-02-17 12:09:06,837 - Validation MSE Loss is 8.424675513178288 at iteration 13.
+2023-02-17 12:09:11,537 - Training GLL is 9749.812440401018 at iteration 14.
+2023-02-17 12:09:11,697 - Validation MSE Loss is 8.437078756818321 at iteration 14.
+2023-02-17 12:09:16,426 - Training GLL is 9728.81990257795 at iteration 15.
+2023-02-17 12:09:16,588 - Validation MSE Loss is 8.421904689596136 at iteration 15.
+2023-02-17 12:09:21,537 - Training GLL is 9850.983179973102 at iteration 1.
+2023-02-17 12:09:21,693 - Validation MSE Loss is 9.121252543676892 at iteration 1.
+2023-02-17 12:09:26,387 - Training GLL is 9907.569934106425 at iteration 2.
+2023-02-17 12:09:26,542 - Validation MSE Loss is 9.068888904035747 at iteration 2.
+2023-02-17 12:09:31,232 - Training GLL is 9915.355032189304 at iteration 3.
+2023-02-17 12:09:31,391 - Validation MSE Loss is 9.061796271959754 at iteration 3.
+2023-02-17 12:09:36,110 - Training GLL is 9917.477567466654 at iteration 4.
+2023-02-17 12:09:36,270 - Validation MSE Loss is 9.070680285108294 at iteration 4.
+2023-02-17 12:09:40,993 - Training GLL is 9910.425373484031 at iteration 5.
+2023-02-17 12:09:41,151 - Validation MSE Loss is 9.062344829213165 at iteration 5.
+2023-02-17 12:09:45,864 - Training GLL is 9907.211129207235 at iteration 6.
+2023-02-17 12:09:46,019 - Validation MSE Loss is 9.058816137110622 at iteration 6.
+2023-02-17 12:09:50,786 - Training GLL is 9901.265769812133 at iteration 7.
+2023-02-17 12:09:50,943 - Validation MSE Loss is 9.073684965201553 at iteration 7.
+2023-02-17 12:09:55,636 - Training GLL is 9889.963817915752 at iteration 8.
+2023-02-17 12:09:55,790 - Validation MSE Loss is 9.062252417352287 at iteration 8.
+2023-02-17 12:10:00,669 - Training GLL is 9888.943474559892 at iteration 9.
+2023-02-17 12:10:00,824 - Validation MSE Loss is 9.066530605852991 at iteration 9.
+2023-02-17 12:10:05,545 - Training GLL is 9880.17330685973 at iteration 10.
+2023-02-17 12:10:05,705 - Validation MSE Loss is 9.062556644600518 at iteration 10.
+2023-02-17 12:10:10,525 - Training GLL is 9865.685380213363 at iteration 11.
+2023-02-17 12:10:10,680 - Validation MSE Loss is 9.055660033977139 at iteration 11.
+2023-02-17 12:10:15,581 - Training GLL is 9857.204840894736 at iteration 12.
+2023-02-17 12:10:15,736 - Validation MSE Loss is 9.065894666380753 at iteration 12.
+2023-02-17 12:10:20,392 - Training GLL is 9851.533788084736 at iteration 13.
+2023-02-17 12:10:20,545 - Validation MSE Loss is 9.070505627504478 at iteration 13.
+2023-02-17 12:10:25,177 - Training GLL is 9841.686519830391 at iteration 14.
+2023-02-17 12:10:25,330 - Validation MSE Loss is 9.053151279605236 at iteration 14.
+2023-02-17 12:10:30,028 - Training GLL is 9834.75171708457 at iteration 15.
+2023-02-17 12:10:30,182 - Validation MSE Loss is 9.067552140050092 at iteration 15.
+2023-02-17 12:10:34,927 - Training GLL is 9873.074618284358 at iteration 1.
+2023-02-17 12:10:35,090 - Validation MSE Loss is 8.482662486898553 at iteration 1.
+2023-02-17 12:10:39,586 - Training GLL is 9948.932764789837 at iteration 2.
+2023-02-17 12:10:39,752 - Validation MSE Loss is 8.518262341768926 at iteration 2.
+2023-02-17 12:10:44,434 - Training GLL is 9950.8755298298 at iteration 3.
+2023-02-17 12:10:44,597 - Validation MSE Loss is 8.514703117329564 at iteration 3.
+2023-02-17 12:10:49,138 - Training GLL is 9955.423023626137 at iteration 4.
+2023-02-17 12:10:49,308 - Validation MSE Loss is 8.518974854485565 at iteration 4.
+2023-02-17 12:10:53,963 - Training GLL is 9946.390227067492 at iteration 5.
+2023-02-17 12:10:54,143 - Validation MSE Loss is 8.51304781759983 at iteration 5.
+2023-02-17 12:10:58,857 - Training GLL is 9931.677374008827 at iteration 6.
+2023-02-17 12:10:59,024 - Validation MSE Loss is 8.52811999416105 at iteration 6.
+2023-02-17 12:11:03,685 - Training GLL is 9933.264641601392 at iteration 7.
+2023-02-17 12:11:03,849 - Validation MSE Loss is 8.517393881399164 at iteration 7.
+2023-02-17 12:11:08,518 - Training GLL is 9917.343581999101 at iteration 8.
+2023-02-17 12:11:08,682 - Validation MSE Loss is 8.517098856333323 at iteration 8.
+2023-02-17 12:11:13,230 - Training GLL is 9911.929979552531 at iteration 9.
+2023-02-17 12:11:13,394 - Validation MSE Loss is 8.507468138011761 at iteration 9.
+2023-02-17 12:11:17,965 - Training GLL is 9908.59179121861 at iteration 10.
+2023-02-17 12:11:18,129 - Validation MSE Loss is 8.523182953119885 at iteration 10.
+2023-02-17 12:11:22,795 - Training GLL is 9895.114872914606 at iteration 11.
+2023-02-17 12:11:22,960 - Validation MSE Loss is 8.519588486805453 at iteration 11.
+2023-02-17 12:11:27,843 - Training GLL is 9884.88745509451 at iteration 12.
+2023-02-17 12:11:28,009 - Validation MSE Loss is 8.524357068254432 at iteration 12.
+2023-02-17 12:11:32,871 - Training GLL is 9873.777329626173 at iteration 13.
+2023-02-17 12:11:33,039 - Validation MSE Loss is 8.52128167264847 at iteration 13.
+2023-02-17 12:11:37,811 - Training GLL is 9870.875820084528 at iteration 14.
+2023-02-17 12:11:37,977 - Validation MSE Loss is 8.527558351107526 at iteration 14.
+2023-02-17 12:11:42,687 - Training GLL is 9857.21813625814 at iteration 15.
+2023-02-17 12:11:42,852 - Validation MSE Loss is 8.523338091362733 at iteration 15.
+2023-02-17 12:11:47,891 - Training GLL is 9832.299782753407 at iteration 1.
+2023-02-17 12:11:48,044 - Validation MSE Loss is 8.946367043568063 at iteration 1.
+2023-02-17 12:11:52,771 - Training GLL is 9901.909554529515 at iteration 2.
+2023-02-17 12:11:52,922 - Validation MSE Loss is 8.962968576362726 at iteration 2.
+2023-02-17 12:11:58,030 - Training GLL is 9916.545634785904 at iteration 3.
+2023-02-17 12:11:58,182 - Validation MSE Loss is 8.97455406383417 at iteration 3.
+2023-02-17 12:12:02,839 - Training GLL is 9923.354201577195 at iteration 4.
+2023-02-17 12:12:02,989 - Validation MSE Loss is 8.974881425387188 at iteration 4.
+2023-02-17 12:12:07,816 - Training GLL is 9922.27868968432 at iteration 5.
+2023-02-17 12:12:07,966 - Validation MSE Loss is 8.962208459617981 at iteration 5.
+2023-02-17 12:12:12,916 - Training GLL is 9914.948984478731 at iteration 6.
+2023-02-17 12:12:13,066 - Validation MSE Loss is 8.973665138353196 at iteration 6.
+2023-02-17 12:12:17,934 - Training GLL is 9910.865631379593 at iteration 7.
+2023-02-17 12:12:18,088 - Validation MSE Loss is 8.959451943330617 at iteration 7.
+2023-02-17 12:12:22,907 - Training GLL is 9906.01935198156 at iteration 8.
+2023-02-17 12:12:23,072 - Validation MSE Loss is 8.954797743866996 at iteration 8.
+2023-02-17 12:12:27,734 - Training GLL is 9901.466247955907 at iteration 9.
+2023-02-17 12:12:27,885 - Validation MSE Loss is 8.973159407034396 at iteration 9.
+2023-02-17 12:12:32,460 - Training GLL is 9892.965811066897 at iteration 10.
+2023-02-17 12:12:32,610 - Validation MSE Loss is 8.970335583584431 at iteration 10.
+2023-02-17 12:12:37,409 - Training GLL is 9878.922115539614 at iteration 11.
+2023-02-17 12:12:37,561 - Validation MSE Loss is 8.972742616439168 at iteration 11.
+2023-02-17 12:12:42,129 - Training GLL is 9865.69132305006 at iteration 12.
+2023-02-17 12:12:42,284 - Validation MSE Loss is 8.961068528364725 at iteration 12.
+2023-02-17 12:12:46,891 - Training GLL is 9865.019798379524 at iteration 13.
+2023-02-17 12:12:47,041 - Validation MSE Loss is 8.962426466230188 at iteration 13.
+2023-02-17 12:12:52,345 - Training GLL is 9855.076200020689 at iteration 14.
+2023-02-17 12:12:52,497 - Validation MSE Loss is 8.961341135317456 at iteration 14.
+2023-02-17 12:12:58,599 - Training GLL is 9837.708602722592 at iteration 15.
+2023-02-17 12:12:58,762 - Validation MSE Loss is 8.954959546786032 at iteration 15.
+2023-02-17 12:13:03,851 - Training GLL is 9739.736122333205 at iteration 1.
+2023-02-17 12:13:04,009 - Validation MSE Loss is 8.997244254276621 at iteration 1.
+2023-02-17 12:13:08,770 - Training GLL is 9833.176097918224 at iteration 2.
+2023-02-17 12:13:08,928 - Validation MSE Loss is 9.033014249086671 at iteration 2.
+2023-02-17 12:13:13,602 - Training GLL is 9843.594797038137 at iteration 3.
+2023-02-17 12:13:13,760 - Validation MSE Loss is 9.050086758226797 at iteration 3.
+2023-02-17 12:13:18,461 - Training GLL is 9842.256264046855 at iteration 4.
+2023-02-17 12:13:18,619 - Validation MSE Loss is 9.05430173351663 at iteration 4.
+2023-02-17 12:13:23,389 - Training GLL is 9842.55558309431 at iteration 5.
+2023-02-17 12:13:23,546 - Validation MSE Loss is 9.071224858826062 at iteration 5.
+2023-02-17 12:13:28,129 - Training GLL is 9832.271851100137 at iteration 6.
+2023-02-17 12:13:28,286 - Validation MSE Loss is 9.059194940376111 at iteration 6.
+2023-02-17 12:13:32,869 - Training GLL is 9834.662539835983 at iteration 7.
+2023-02-17 12:13:33,025 - Validation MSE Loss is 9.072113175835659 at iteration 7.
+2023-02-17 12:13:37,595 - Training GLL is 9820.088334141348 at iteration 8.
+2023-02-17 12:13:37,751 - Validation MSE Loss is 9.074647398117232 at iteration 8.
+2023-02-17 12:13:42,578 - Training GLL is 9801.405968812674 at iteration 9.
+2023-02-17 12:13:42,740 - Validation MSE Loss is 9.069027978982682 at iteration 9.
+2023-02-17 12:13:47,390 - Training GLL is 9803.340664622583 at iteration 10.
+2023-02-17 12:13:47,545 - Validation MSE Loss is 9.06762522355636 at iteration 10.
+2023-02-17 12:13:52,155 - Training GLL is 9792.046226135968 at iteration 11.
+2023-02-17 12:13:52,310 - Validation MSE Loss is 9.082512655751161 at iteration 11.
+2023-02-17 12:13:56,975 - Training GLL is 9776.888900352174 at iteration 12.
+2023-02-17 12:13:57,133 - Validation MSE Loss is 9.085001649174524 at iteration 12.
+2023-02-17 12:14:01,765 - Training GLL is 9776.672064920018 at iteration 13.
+2023-02-17 12:14:01,925 - Validation MSE Loss is 9.07151333391536 at iteration 13.
+2023-02-17 12:14:06,453 - Training GLL is 9755.780125271764 at iteration 14.
+2023-02-17 12:14:06,609 - Validation MSE Loss is 9.06466956943445 at iteration 14.
+2023-02-17 12:14:11,152 - Training GLL is 9744.186356543474 at iteration 15.
+2023-02-17 12:14:11,307 - Validation MSE Loss is 9.076677707922245 at iteration 15.
+2023-02-17 12:14:16,149 - Training GLL is 9672.077401233044 at iteration 1.
+2023-02-17 12:14:16,305 - Validation MSE Loss is 8.44954185260383 at iteration 1.
+2023-02-17 12:14:20,900 - Training GLL is 9748.009295486592 at iteration 2.
+2023-02-17 12:14:21,056 - Validation MSE Loss is 8.530989234917977 at iteration 2.
+2023-02-17 12:14:25,651 - Training GLL is 9766.809722769913 at iteration 3.
+2023-02-17 12:14:25,808 - Validation MSE Loss is 8.542060490711188 at iteration 3.
+2023-02-17 12:14:30,547 - Training GLL is 9768.617959080835 at iteration 4.
+2023-02-17 12:14:30,702 - Validation MSE Loss is 8.555466971108476 at iteration 4.
+2023-02-17 12:14:35,311 - Training GLL is 9769.499179779788 at iteration 5.
+2023-02-17 12:14:35,466 - Validation MSE Loss is 8.553934395873792 at iteration 5.
+2023-02-17 12:14:40,150 - Training GLL is 9761.786651815823 at iteration 6.
+2023-02-17 12:14:40,306 - Validation MSE Loss is 8.56407356922474 at iteration 6.
+2023-02-17 12:14:44,874 - Training GLL is 9759.821060397351 at iteration 7.
+2023-02-17 12:14:45,032 - Validation MSE Loss is 8.56500472772149 at iteration 7.
+2023-02-17 12:14:49,783 - Training GLL is 9752.137808847778 at iteration 8.
+2023-02-17 12:14:49,939 - Validation MSE Loss is 8.561639836481923 at iteration 8.
+2023-02-17 12:14:54,613 - Training GLL is 9746.433267371593 at iteration 9.
+2023-02-17 12:14:54,768 - Validation MSE Loss is 8.563208092979846 at iteration 9.
+2023-02-17 12:14:59,760 - Training GLL is 9738.33884848158 at iteration 10.
+2023-02-17 12:14:59,919 - Validation MSE Loss is 8.576474540475425 at iteration 10.
+2023-02-17 12:15:04,707 - Training GLL is 9730.169175537083 at iteration 11.
+2023-02-17 12:15:04,865 - Validation MSE Loss is 8.562913787570848 at iteration 11.
+2023-02-17 12:15:09,475 - Training GLL is 9732.647134059072 at iteration 12.
+2023-02-17 12:15:09,630 - Validation MSE Loss is 8.574773445366624 at iteration 12.
+2023-02-17 12:15:14,431 - Training GLL is 9719.626750416133 at iteration 13.
+2023-02-17 12:15:14,588 - Validation MSE Loss is 8.560592604774842 at iteration 13.
+2023-02-17 12:15:19,222 - Training GLL is 9710.75074300519 at iteration 14.
+2023-02-17 12:15:19,378 - Validation MSE Loss is 8.566986271711071 at iteration 14.
+2023-02-17 12:15:24,002 - Training GLL is 9697.777445934833 at iteration 15.
+2023-02-17 12:15:24,157 - Validation MSE Loss is 8.568653455611562 at iteration 15.
+2023-02-17 12:15:28,870 - Training GLL is 9650.931408569973 at iteration 1.
+2023-02-17 12:15:29,032 - Validation MSE Loss is 7.949125727691215 at iteration 1.
+2023-02-17 12:15:33,804 - Training GLL is 9741.55698257083 at iteration 2.
+2023-02-17 12:15:33,963 - Validation MSE Loss is 7.967914512975453 at iteration 2.
+2023-02-17 12:15:38,831 - Training GLL is 9760.620336284417 at iteration 3.
+2023-02-17 12:15:39,010 - Validation MSE Loss is 7.975536775651709 at iteration 3.
+2023-02-17 12:15:43,546 - Training GLL is 9767.138924542462 at iteration 4.
+2023-02-17 12:15:43,704 - Validation MSE Loss is 7.979048251888129 at iteration 4.
+2023-02-17 12:15:48,334 - Training GLL is 9756.204971415018 at iteration 5.
+2023-02-17 12:15:48,491 - Validation MSE Loss is 7.986130334882387 at iteration 5.
+2023-02-17 12:15:53,152 - Training GLL is 9751.08803862624 at iteration 6.
+2023-02-17 12:15:53,311 - Validation MSE Loss is 7.980305861230856 at iteration 6.
+2023-02-17 12:15:57,901 - Training GLL is 9752.379146524212 at iteration 7.
+2023-02-17 12:15:58,072 - Validation MSE Loss is 7.98020996378672 at iteration 7.
+2023-02-17 12:16:02,732 - Training GLL is 9736.250216996303 at iteration 8.
+2023-02-17 12:16:02,893 - Validation MSE Loss is 7.991470667997754 at iteration 8.
+2023-02-17 12:16:07,443 - Training GLL is 9733.991225518106 at iteration 9.
+2023-02-17 12:16:07,602 - Validation MSE Loss is 7.983667201912307 at iteration 9.
+2023-02-17 12:16:12,206 - Training GLL is 9730.890609120837 at iteration 10.
+2023-02-17 12:16:12,365 - Validation MSE Loss is 7.985255482144323 at iteration 10.
+2023-02-17 12:16:17,025 - Training GLL is 9713.371825470009 at iteration 11.
+2023-02-17 12:16:17,184 - Validation MSE Loss is 7.9812014269610785 at iteration 11.
+2023-02-17 12:16:21,772 - Training GLL is 9701.360477682842 at iteration 12.
+2023-02-17 12:16:21,930 - Validation MSE Loss is 7.979350419641338 at iteration 12.
+2023-02-17 12:16:26,544 - Training GLL is 9696.435624537806 at iteration 13.
+2023-02-17 12:16:26,704 - Validation MSE Loss is 7.984576312821025 at iteration 13.
+2023-02-17 12:16:31,222 - Training GLL is 9685.627322311497 at iteration 14.
+2023-02-17 12:16:31,380 - Validation MSE Loss is 7.977597929029653 at iteration 14.
+2023-02-17 12:16:35,955 - Training GLL is 9677.988522398406 at iteration 15.
+2023-02-17 12:16:36,113 - Validation MSE Loss is 7.979908377786832 at iteration 15.
+2023-02-17 12:16:41,025 - Training GLL is 9708.41998257111 at iteration 1.
+2023-02-17 12:16:41,184 - Validation MSE Loss is 7.16163392054242 at iteration 1.
+2023-02-17 12:16:45,853 - Training GLL is 9788.802164565464 at iteration 2.
+2023-02-17 12:16:46,007 - Validation MSE Loss is 7.200724767363128 at iteration 2.
+2023-02-17 12:16:50,668 - Training GLL is 9813.615499740328 at iteration 3.
+2023-02-17 12:16:50,822 - Validation MSE Loss is 7.217801996069703 at iteration 3.
+2023-02-17 12:16:55,796 - Training GLL is 9805.70249727234 at iteration 4.
+2023-02-17 12:16:55,969 - Validation MSE Loss is 7.238567788960999 at iteration 4.
+2023-02-17 12:17:00,850 - Training GLL is 9804.696885156416 at iteration 5.
+2023-02-17 12:17:01,009 - Validation MSE Loss is 7.227375165863002 at iteration 5.
+2023-02-17 12:17:05,752 - Training GLL is 9789.646104770156 at iteration 6.
+2023-02-17 12:17:05,911 - Validation MSE Loss is 7.238421658034147 at iteration 6.
+2023-02-17 12:17:10,704 - Training GLL is 9786.361076149531 at iteration 7.
+2023-02-17 12:17:10,856 - Validation MSE Loss is 7.231327100691946 at iteration 7.
+2023-02-17 12:17:15,549 - Training GLL is 9770.552807906635 at iteration 8.
+2023-02-17 12:17:15,705 - Validation MSE Loss is 7.245671887395475 at iteration 8.
+2023-02-17 12:17:20,614 - Training GLL is 9762.531260769907 at iteration 9.
+2023-02-17 12:17:20,771 - Validation MSE Loss is 7.241502623399915 at iteration 9.
+2023-02-17 12:17:25,520 - Training GLL is 9747.794098925975 at iteration 10.
+2023-02-17 12:17:25,675 - Validation MSE Loss is 7.236363903861647 at iteration 10.
+2023-02-17 12:17:30,195 - Training GLL is 9736.981745873441 at iteration 11.
+2023-02-17 12:17:30,349 - Validation MSE Loss is 7.235761011948665 at iteration 11.
+2023-02-17 12:17:34,896 - Training GLL is 9729.881012366022 at iteration 12.
+2023-02-17 12:17:35,049 - Validation MSE Loss is 7.242425747008477 at iteration 12.
+2023-02-17 12:17:39,899 - Training GLL is 9708.824529364036 at iteration 13.
+2023-02-17 12:17:40,053 - Validation MSE Loss is 7.233995441050409 at iteration 13.
+2023-02-17 12:17:44,814 - Training GLL is 9705.5913867263 at iteration 14.
+2023-02-17 12:17:44,968 - Validation MSE Loss is 7.235798525909842 at iteration 14.
+2023-02-17 12:17:49,755 - Training GLL is 9686.600779802451 at iteration 15.
+2023-02-17 12:17:49,911 - Validation MSE Loss is 7.241144187658413 at iteration 15.
+
+
+Done 10-fold CV: 1047.39 s
+
+
+Median Spearman correlation for all gRNAs of each gene: 
+E75 Rousset (median/mean): 0.41818181818181815 / 0.3679624338063291 
+E18 Cui (median/mean): 0.4285714285714286 / 0.3792901507203684 
+Wang (median/mean): 0.37252747252747254 / 0.317823019428407 
+Mixed 3 datasets (median/mean): 0.3928571428571428 / 0.3475499965460863 
+
+
+2023-02-17 12:17:55,945 - Training GLL is 11265.67640872248 at iteration 1.
+2023-02-17 12:17:56,112 - Validation MSE Loss is 8.707599247220152 at iteration 1.
+2023-02-17 12:18:01,618 - Training GLL is 11350.009330077926 at iteration 2.
+2023-02-17 12:18:01,785 - Validation MSE Loss is 8.718147183127666 at iteration 2.
+2023-02-17 12:18:07,228 - Training GLL is 11372.18506821898 at iteration 3.
+2023-02-17 12:18:07,399 - Validation MSE Loss is 8.742871996123899 at iteration 3.
+2023-02-17 12:18:12,749 - Training GLL is 11372.319571022379 at iteration 4.
+2023-02-17 12:18:12,915 - Validation MSE Loss is 8.752302501043076 at iteration 4.
+2023-02-17 12:18:18,324 - Training GLL is 11366.500646708922 at iteration 5.
+2023-02-17 12:18:18,491 - Validation MSE Loss is 8.748442961190676 at iteration 5.
+2023-02-17 12:18:23,863 - Training GLL is 11358.506852128898 at iteration 6.
+2023-02-17 12:18:24,030 - Validation MSE Loss is 8.742309344901885 at iteration 6.
+2023-02-17 12:18:29,261 - Training GLL is 11357.19587894367 at iteration 7.
+2023-02-17 12:18:29,427 - Validation MSE Loss is 8.751018525618937 at iteration 7.
+2023-02-17 12:18:34,842 - Training GLL is 11346.249497956002 at iteration 8.
+2023-02-17 12:18:35,008 - Validation MSE Loss is 8.759052786576067 at iteration 8.
+2023-02-17 12:18:40,496 - Training GLL is 11335.169167778186 at iteration 9.
+2023-02-17 12:18:40,667 - Validation MSE Loss is 8.755856834789068 at iteration 9.
+2023-02-17 12:18:45,885 - Training GLL is 11334.24541992612 at iteration 10.
+2023-02-17 12:18:46,048 - Validation MSE Loss is 8.74794202840296 at iteration 10.
+2023-02-17 12:18:51,503 - Training GLL is 11316.03398083933 at iteration 11.
+2023-02-17 12:18:51,670 - Validation MSE Loss is 8.763585500194683 at iteration 11.
+2023-02-17 12:18:57,105 - Training GLL is 11314.185393601028 at iteration 12.
+2023-02-17 12:18:57,272 - Validation MSE Loss is 8.746792631306626 at iteration 12.
+2023-02-17 12:19:02,831 - Training GLL is 11303.073632847329 at iteration 13.
+2023-02-17 12:19:02,998 - Validation MSE Loss is 8.746649849638194 at iteration 13.
+2023-02-17 12:19:08,581 - Training GLL is 11287.352522701076 at iteration 14.
+2023-02-17 12:19:08,747 - Validation MSE Loss is 8.749907839928946 at iteration 14.
+2023-02-17 12:19:14,349 - Training GLL is 11278.840241440828 at iteration 15.
+2023-02-17 12:19:14,516 - Validation MSE Loss is 8.746682774586402 at iteration 15.
+Done saving model: 1131.96 s
+Done calculating SHAP values: 1577.939 s
+2023-02-17 12:26:40,626 - findfont: Font family ['sans-serif'] not found. Falling back to DejaVu Sans.
+2023-02-17 12:26:40,626 - findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+2023-02-17 12:26:40,634 - findfont: Font family ['sans-serif'] not found. Falling back to DejaVu Sans.
+2023-02-17 12:26:40,634 - findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+2023-02-17 12:26:40,950 - findfont: Font family ['sans-serif'] not found. Falling back to DejaVu Sans.
+2023-02-17 12:26:40,950 - findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+2023-02-17 12:26:41,395 - findfont: Font family ['sans-serif'] not found. Falling back to DejaVu Sans.
+2023-02-17 12:26:41,395 - findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+2023-02-17 12:26:49,927 - Training GLL is 8957.956465043537 at iteration 1.
+2023-02-17 12:26:50,074 - Validation MSE Loss is 8.000817693401892 at iteration 1.
+2023-02-17 12:26:54,113 - Training GLL is 9011.442777928783 at iteration 2.
+2023-02-17 12:26:54,262 - Validation MSE Loss is 8.034822142835752 at iteration 2.
+2023-02-17 12:26:58,763 - Training GLL is 9022.772557187784 at iteration 3.
+2023-02-17 12:26:58,913 - Validation MSE Loss is 8.045930439383168 at iteration 3.
+2023-02-17 12:27:03,080 - Training GLL is 9021.787745190702 at iteration 4.
+2023-02-17 12:27:03,232 - Validation MSE Loss is 8.067236080127714 at iteration 4.
+2023-02-17 12:27:07,483 - Training GLL is 9014.968489843883 at iteration 5.
+2023-02-17 12:27:07,634 - Validation MSE Loss is 8.056425486464375 at iteration 5.
+2023-02-17 12:27:11,856 - Training GLL is 9014.406743880689 at iteration 6.
+2023-02-17 12:27:12,006 - Validation MSE Loss is 8.062341709827148 at iteration 6.
+2023-02-17 12:27:16,176 - Training GLL is 9005.649015147663 at iteration 7.
+2023-02-17 12:27:16,325 - Validation MSE Loss is 8.072041986087507 at iteration 7.
+2023-02-17 12:27:20,658 - Training GLL is 8997.534474922053 at iteration 8.
+2023-02-17 12:27:20,809 - Validation MSE Loss is 8.069100275571216 at iteration 8.
+2023-02-17 12:27:24,944 - Training GLL is 8991.252522098264 at iteration 9.
+2023-02-17 12:27:25,092 - Validation MSE Loss is 8.086439679648 at iteration 9.
+2023-02-17 12:27:29,217 - Training GLL is 8987.297724390786 at iteration 10.
+2023-02-17 12:27:29,436 - Validation MSE Loss is 8.073968782231395 at iteration 10.
+2023-02-17 12:27:33,676 - Training GLL is 8976.058617529447 at iteration 11.
+2023-02-17 12:27:33,824 - Validation MSE Loss is 8.06810722673327 at iteration 11.
+2023-02-17 12:27:38,197 - Training GLL is 8967.074761520722 at iteration 12.
+2023-02-17 12:27:38,349 - Validation MSE Loss is 8.077802311980063 at iteration 12.
+2023-02-17 12:27:42,676 - Training GLL is 8959.925303097785 at iteration 13.
+2023-02-17 12:27:42,826 - Validation MSE Loss is 8.08400184995731 at iteration 13.
+2023-02-17 12:27:47,081 - Training GLL is 8947.978444238732 at iteration 14.
+2023-02-17 12:27:47,230 - Validation MSE Loss is 8.085441764785914 at iteration 14.
+2023-02-17 12:27:51,552 - Training GLL is 8934.166252489294 at iteration 15.
+2023-02-17 12:27:51,700 - Validation MSE Loss is 8.085658257536059 at iteration 15.
+
+
+
+Done training model: 1649.12 s
+Spearman corelation of combined test: 0.23634954857796067
+Pearson corelation of combined test: 0.24240689083884986
+
+Execution Time: 1651.26 seconds
