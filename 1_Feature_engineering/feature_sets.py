@@ -51,6 +51,7 @@ Which feature sets to use:
     add_distance: sequence and distance features
     add_MFE:sequence, distance, and MFE features
     only_guide:all 128 guide features
+    guide_geneid: all 128 guide features and geneID
     gene_seq:sequence features and gene features
     add_deltaGB: sequence, distance, and CRISPRoff score features
     all_deltaGB: replacing 4 MFE features with CRISPRoff score
@@ -96,7 +97,7 @@ def DataFrame_input(df,coding_strand=1):
     #     df_gene=df[df['geneid']==i]
     #     for j in df_gene.index:
     #         df.at[j,'Nr_guide']=df_gene.shape[0]
-    print(len(set(df[df['dataset']==1]['geneid'])))
+    # print(len(set(df[df['dataset']==1]['geneid'])))
     for dataset in range(len(set(df['dataset']))):
         dataset_df=df[df['dataset']==dataset]
         for i in list(set(dataset_df['geneid'])):
@@ -106,7 +107,7 @@ def DataFrame_input(df,coding_strand=1):
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
     df=df[df['Nr_guide']>=5] #keep only genes with more than 5 guides from all 3 datasets
     logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
-    print(len(set(df[df['dataset']==1]['geneid'])))
+    # print(len(set(df[df['dataset']==1]['geneid'])))
     sequences=list(dict.fromkeys(df['sequence']))
     
     y=np.array(df['log2FC'],dtype=float)
@@ -122,10 +123,12 @@ def DataFrame_input(df,coding_strand=1):
     drop_features=['geneid','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality',
                    'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
-    if choice=='all' or choice=='only_guide':
+    if choice=='all' or choice=='only_guide' or choice=='guide_geneid':
         drop_features+=['CRISPRoff_score']
     elif choice=='all_deltaGB':
         drop_features+=['MFE_hybrid_seed','MFE_homodimer_guide','MFE_hybrid_full','MFE_monomer_guide']
+    if choice=='guide_geneid':
+        drop_features.remove('geneid')
     for feature in drop_features:
         try:
             df=df.drop(feature,1)
@@ -145,6 +148,8 @@ def DataFrame_input(df,coding_strand=1):
         headers=['distance_start_codon','distance_start_codon_perc']+['MFE_hybrid_full','MFE_hybrid_seed','MFE_homodimer_guide','MFE_monomer_guide']
     elif choice=='add_deltaGB':
         headers=['distance_start_codon','distance_start_codon_perc']+['CRISPRoff_score']
+    elif choice=="guide_geneid":
+        headers=[item for item in headers if item not in gene_features]+['geneid']
     elif choice=='gene_seq':
         headers=[item for item in headers if item in gene_features]
     X=X[headers]
@@ -289,7 +294,7 @@ def main():
     evaluations=defaultdict(list)
     kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
     fold=1
-    plt.figure()
+    # plt.figure()
     guideid_set=list(set(guideids))
     for train_index, test_index in kf.split(guideid_set):
         ##split the combined training set into train and test based on guideid
@@ -313,7 +318,7 @@ def main():
         predictions = estimator.predict(np.array(X_test,dtype=float))
         evaluations['Rs'].append(spearmanr(y_test, predictions)[0])
         
-        sns.distplot(predictions,label='Fold %s'%fold)
+        # sns.distplot(predictions,label='Fold %s'%fold)
         # Evaluation(output_file_name,y_test,predictions,"X_test_fold_%s"%fold)
         fold+=1
         if len(datasets)>1: #evaluation in mixed and each individual dataset(s)
@@ -331,13 +336,13 @@ def main():
                 spearman_rho,_=spearmanr(y_test_1, predictions)
                 evaluations['Rs_test%s'%(dataset+1)].append(spearman_rho)
                 # Evaluation(output_file_name,y_test_1,predictions,"X_test_%s"%(dataset+1))
-    plt.legend()
-    plt.xlabel('Predicted values',fontsize=14)
-    plt.ylabel('Density',fontsize=14)
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=12)
-    plt.savefig(output_file_name+"/predicted_dist.svg")
-    plt.close()
+    # plt.legend()
+    # plt.xlabel('Predicted values',fontsize=14)
+    # plt.ylabel('Density',fontsize=14)
+    # plt.xticks(fontsize=12)
+    # plt.yticks(fontsize=12)
+    # plt.savefig(output_file_name+"/predicted_dist.svg")
+    # plt.close()
     evaluations=pandas.DataFrame.from_dict(evaluations)
     evaluations.to_csv(output_file_name+'/iteration_scores.csv',sep='\t',index=True)
     

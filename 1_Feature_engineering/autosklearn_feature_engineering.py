@@ -52,6 +52,7 @@ Which feature sets to use:
     add_distance: sequence and distance features
     add_MFE:sequence, distance, and MFE features
     only_guide:all 128 guide features
+    guide_geneid: all 128 guide features and geneID
     gene_seq:sequence features and gene features
     add_deltaGB: sequence, distance, and CRISPRoff score features
     all_deltaGB: replacing 4 MFE features with CRISPRoff score
@@ -138,9 +139,10 @@ def DataFrame_input(df,coding_strand=1):
     drop_features=['geneid','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality',
                    'off_target_90_100','off_target_80_90','off_target_70_80','off_target_60_70','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
-    if choice=='all' or choice=='only_guide':
+    if choice=='all' or choice=='only_guide' or choice=='guide_geneid':
         drop_features+=['CRISPRoff_score']
-    
+    if choice in ['guide_geneid','gene_seq','all']:
+        drop_features.remove('geneid')
     for feature in drop_features:
         try:
             df=df.drop(feature,1)
@@ -161,6 +163,8 @@ def DataFrame_input(df,coding_strand=1):
         headers=['distance_start_codon','distance_start_codon_perc']+['MFE_hybrid_full','MFE_hybrid_seed','MFE_homodimer_guide','MFE_monomer_guide']
     elif choice=='add_deltaGB':
         headers=['distance_start_codon','distance_start_codon_perc']+['CRISPRoff_score']
+    elif choice=="guide_geneid":
+        headers=[item for item in headers if item not in gene_features]+['geneid']
     elif choice=='gene_seq':
         headers=[item for item in headers if item in gene_features]
         
