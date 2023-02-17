@@ -141,7 +141,7 @@ def DataFrame_input(df,coding_strand=1):
                    'off_target_90_100','off_target_80_90','off_target_70_80','off_target_60_70','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
     if choice=='all' or choice=='only_guide' or choice=='guide_geneid':
         drop_features+=['CRISPRoff_score']
-    if choice in ['guide_geneid','gene_seq','all']:
+    if choice in ['guide_geneid']:
         drop_features.remove('geneid')
     for feature in drop_features:
         try:
