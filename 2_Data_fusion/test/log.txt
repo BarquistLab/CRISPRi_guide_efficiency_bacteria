@@ -6,14 +6,14 @@ Total number of guides in dataset ../0_Datasets/E18_Cui.csv: 59246
 Total number of guides in dataset ../0_Datasets/Wang_dataset.csv: 52104
 Training dataset: all 3 datasets
 Number of guides for essential genes: 8099 
-Number of guides after filtering: 7400 
+Number of guides after filtering: 8079 
 Number of features: 137
 Features: gene_length,gene_GC_content,guide_GC_content,distance_start_codon,distance_start_codon_perc,distance_operon,distance_operon_perc,operon_downstream_genes,ess_gene_operon,homopolymers,MFE_hybrid_full,MFE_hybrid_seed,MFE_homodimer_guide,MFE_monomer_guide,gene_expression_min,gene_expression_max,dataset,sequence_1_A,sequence_1_T,sequence_1_C,sequence_1_G,sequence_2_A,sequence_2_T,sequence_2_C,sequence_2_G,sequence_3_A,sequence_3_T,sequence_3_C,sequence_3_G,sequence_4_A,sequence_4_T,sequence_4_C,sequence_4_G,sequence_5_A,sequence_5_T,sequence_5_C,sequence_5_G,sequence_6_A,sequence_6_T,sequence_6_C,sequence_6_G,sequence_7_A,sequence_7_T,sequence_7_C,sequence_7_G,sequence_8_A,sequence_8_T,sequence_8_C,sequence_8_G,sequence_9_A,sequence_9_T,sequence_9_C,sequence_9_G,sequence_10_A,sequence_10_T,sequence_10_C,sequence_10_G,sequence_11_A,sequence_11_T,sequence_11_C,sequence_11_G,sequence_12_A,sequence_12_T,sequence_12_C,sequence_12_G,sequence_13_A,sequence_13_T,sequence_13_C,sequence_13_G,sequence_14_A,sequence_14_T,sequence_14_C,sequence_14_G,sequence_15_A,sequence_15_T,sequence_15_C,sequence_15_G,sequence_16_A,sequence_16_T,sequence_16_C,sequence_16_G,sequence_17_A,sequence_17_T,sequence_17_C,sequence_17_G,sequence_18_A,sequence_18_T,sequence_18_C,sequence_18_G,sequence_19_A,sequence_19_T,sequence_19_C,sequence_19_G,sequence_20_A,sequence_20_T,sequence_20_C,sequence_20_G,sequence_21_A,sequence_21_T,sequence_21_C,sequence_21_G,sequence_22_A,sequence_22_T,sequence_22_C,sequence_22_G,sequence_23_A,sequence_23_T,sequence_23_C,sequence_23_G,sequence_24_A,sequence_24_T,sequence_24_C,sequence_24_G,sequence_25_A,sequence_25_T,sequence_25_C,sequence_25_G,sequence_26_A,sequence_26_T,sequence_26_C,sequence_26_G,sequence_27_A,sequence_27_T,sequence_27_C,sequence_27_G,sequence_28_A,sequence_28_T,sequence_28_C,sequence_28_G,sequence_29_A,sequence_29_T,sequence_29_C,sequence_29_G,sequence_30_A,sequence_30_T,sequence_30_C,sequence_30_G
 
-Data input Time: 1.47 seconds
+Data input Time: 4.90 seconds
 
-Estimator:HistGradientBoostingRegressor(l2_regularization=5.997418027353535e-10,
-                              learning_rate=0.12286466971783992,
-                              max_leaf_nodes=26, min_samples_leaf=8,
-                              n_iter_no_change=0, validation_fraction=None)
-Execution Time: 13.95 seconds
+Estimator:HistGradientBoostingRegressor(l2_regularization=0.005746611563553693,
+                              learning_rate=0.0913971028976721,
+                              max_leaf_nodes=9, min_samples_leaf=2,
+                              n_iter_no_change=20, validation_fraction=None)
+Execution Time: 14.40 seconds

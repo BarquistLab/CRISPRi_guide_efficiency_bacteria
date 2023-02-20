@@ -114,12 +114,10 @@ def DataFrame_input(df,coding_strand=1):
     logging_file= open(output_file_name + '/log.txt','a')
     df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==coding_strand)]
     df=df.dropna()
-    for dataset in range(len(set(df['dataset']))):
-        dataset_df=df[df['dataset']==dataset]
-        for i in list(set(dataset_df['geneid'])):
-            gene_df=dataset_df[dataset_df['geneid']==i]
-            for j in gene_df.index:
-                df.at[j,'Nr_guide']=gene_df.shape[0]
+    for i in list(set(list(df['geneid']))):
+        df_gene=df[df['geneid']==i]
+        for j in df_gene.index:
+            df.at[j,'Nr_guide']=df_gene.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
     df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
     logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])

@@ -67,8 +67,6 @@ Which model type to run:
     svr: SVR
     histgb: Histogram-based gradient boosting
     rf: Random forest
-    lasso_ms: LASSO with hyperparameters same as the MS model
-    rf_ms: RF with hyperparameters same as the MS model
     default: autosklearn
 """)
 
@@ -116,12 +114,16 @@ def DataFrame_input(df,coding_strand=1):
     logging_file= open(output_file_name + '/log.txt','a')
     df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==coding_strand)]
     df=df.dropna()
-    for dataset in range(len(set(df['dataset']))):
-        dataset_df=df[df['dataset']==dataset]
-        for i in list(set(dataset_df['geneid'])):
-            gene_df=dataset_df[dataset_df['geneid']==i]
-            for j in gene_df.index:
-                df.at[j,'Nr_guide']=gene_df.shape[0]
+    for i in list(set(list(df['geneid']))):
+        df_gene=df[df['geneid']==i]
+        for j in df_gene.index:
+            df.at[j,'Nr_guide']=df_gene.shape[0]
+    # for dataset in range(len(set(df['dataset']))):
+    #     dataset_df=df[df['dataset']==dataset]
+    #     for i in list(set(dataset_df['geneid'])):
+    #         gene_df=dataset_df[dataset_df['geneid']==i]
+    #         for j in gene_df.index:
+    #             df.at[j,'Nr_guide']=gene_df.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
     df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
     logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
@@ -259,10 +261,12 @@ def main():
                 params.update({'max_iter':512})
             if 'early_stop' in params.keys():
                 params.pop('early_stop', None)
-            if params['max_depth']=='None':
-                params['max_depth']=None
-            if params['max_leaf_nodes']=='None':
-                params['max_leaf_nodes']=None
+            if 'max_depth' in params.keys():
+                if params['max_depth']=='None':
+                    params['max_depth']=None
+            if 'max_leaf_nodes' in params.keys():
+                if params['max_leaf_nodes']=='None':
+                    params['max_leaf_nodes']=None
             if 'Gradient Boosting' in str(estimator):
                 from sklearn.experimental import enable_hist_gradient_boosting
                 from sklearn.ensemble import HistGradientBoostingRegressor
@@ -295,16 +299,6 @@ def main():
     if choice=='rf':
         from sklearn.ensemble import RandomForestRegressor
         estimator=RandomForestRegressor(random_state=np.random.seed(111))
-    if choice=='lasso_ms':
-        estimator = linear_model.Lasso(alpha=0.00688747788834081,random_state = np.random.seed(111))
-    if choice=='rf_ms':
-        from sklearn.ensemble import RandomForestRegressor
-        estimator=RandomForestRegressor(bootstrap=False, criterion='friedman_mse', max_depth=23, 
-                                max_features=0.1068891175592991, max_leaf_nodes=None,
-                                min_impurity_decrease=0.0, 
-                                min_samples_leaf=18, min_samples_split=19,
-                                min_weight_fraction_leaf=0.0, n_estimators=760, n_jobs=1,
-                                verbose=0, warm_start=False,random_state = np.random.seed(111))
     open(output_file_name + '/log.txt','a').write("Estimator:"+str(estimator)+"\n")
     X_df=pandas.DataFrame(data=np.c_[X,y,guideids],columns=headers+['log2FC','guideid'])
     #k-fold cross validation

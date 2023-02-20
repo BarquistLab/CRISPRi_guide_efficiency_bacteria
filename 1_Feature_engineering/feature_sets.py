@@ -53,8 +53,6 @@ Which feature sets to use:
     only_guide:all 128 guide features
     guide_geneid: all 128 guide features and geneID
     gene_seq:sequence features and gene features
-    add_deltaGB: sequence, distance, and CRISPRoff score features
-    all_deltaGB: replacing 4 MFE features with CRISPRoff score
 default: all""")
 args = parser.parse_args()
 choice=args.choice
@@ -93,21 +91,13 @@ def DataFrame_input(df,coding_strand=1):
     logging_file= open(output_file_name + '/log.txt','a')
     df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==coding_strand)]
     df=df.dropna()
-    # for i in list(set(list(df['geneid']))):
-    #     df_gene=df[df['geneid']==i]
-    #     for j in df_gene.index:
-    #         df.at[j,'Nr_guide']=df_gene.shape[0]
-    # print(len(set(df[df['dataset']==1]['geneid'])))
-    for dataset in range(len(set(df['dataset']))):
-        dataset_df=df[df['dataset']==dataset]
-        for i in list(set(dataset_df['geneid'])):
-            gene_df=dataset_df[dataset_df['geneid']==i]
-            for j in gene_df.index:
-                df.at[j,'Nr_guide']=gene_df.shape[0]
+    for i in list(set(list(df['geneid']))):
+        df_gene=df[df['geneid']==i]
+        for j in df_gene.index:
+            df.at[j,'Nr_guide']=df_gene.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
     df=df[df['Nr_guide']>=5] #keep only genes with more than 5 guides from all 3 datasets
     logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
-    # print(len(set(df[df['dataset']==1]['geneid'])))
     sequences=list(dict.fromkeys(df['sequence']))
     
     y=np.array(df['log2FC'],dtype=float)
@@ -260,16 +250,18 @@ def main():
         print(estimator.get_params())
         
         params=estimator.get_params()
-        params.update({"random_state":np.random.seed(111)})
+        if 'ARD' not in str(estimator):
+            params.update({"random_state":np.random.seed(111)})
         if 'max_iter' in params.keys():
             params.update({'max_iter':512})
         if 'early_stop' in params.keys():
             params.pop('early_stop', None)
-        if params['max_depth']=='None':
-            params['max_depth']=None
-        if params['max_leaf_nodes']=='None':
-            params['max_leaf_nodes']=None
-        
+        if 'max_depth' in params.keys():
+            if params['max_depth']=='None':
+                params['max_depth']=None
+        if 'max_leaf_nodes' in params.keys():
+            if params['max_leaf_nodes']=='None':
+                params['max_leaf_nodes']=None
         if 'Gradient Boosting' in str(estimator):
             from sklearn.experimental import enable_hist_gradient_boosting
             from sklearn.ensemble import HistGradientBoostingRegressor
@@ -279,9 +271,15 @@ def main():
         elif 'Random Forest' in str(estimator):
             from sklearn.ensemble import RandomForestRegressor
             estimator=RandomForestRegressor(**params)
+        elif 'ARD' in str(estimator):
+            params.pop("random_state")
+            from sklearn.linear_model import ARDRegression
+            estimator=ARDRegression(**params)
         else:
             print(str(estimator))
-            estimator=estimator.set_params(**params)
+            print("this estimator is not yet included in the script...")
+            sys.exit()
+
     else:
         print("Please include the saved regressor from auto-sklearn with option -r. ")
         print("Abort.")
@@ -354,8 +352,11 @@ def main():
     X_train = X_train[headers]
     X_train=X_train.astype(dtypes)
     estimator.fit(np.array(X_train,dtype=float),np.array(y_train,dtype=float))
-    SHAP(estimator,X_train,y,headers) #model interpretation using SHAP
-    
+    try:
+        SHAP(estimator,X_train,y,headers) #model interpretation using SHAP
+    except Exception as e: 
+        print("Interpretation using SHAP failed due to:")
+        print(e)
 
 if __name__ == '__main__':
     main()
