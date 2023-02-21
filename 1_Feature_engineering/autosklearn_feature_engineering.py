@@ -233,6 +233,7 @@ def Evaluation(output_file_name,y,predictions,name):
 
 
 def main():
+    open(output_file_name + '/log.txt','a').write(time.asctime())
     open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
     open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)
     # load 3 datesets
@@ -274,26 +275,27 @@ def main():
     X_test=np.array(X_test,dtype=float)
     
     estimator = autosklearn.regression.AutoSklearnRegressor(
-            ensemble_kwargs={"ensemble_size": ensemble_size},
+            ensemble_size=ensemble_size,
             time_left_for_this_task=time_left_for_this_task,
             per_run_time_limit=per_run_time_limit,
-            include = {'feature_preprocessor': ["no_preprocessing"]},
+            include_estimators=include_estimators,
+            include_preprocessors=include_preprocessors,
             resampling_strategy='cv',
             resampling_strategy_arguments={'folds': folds},
             tmp_folder=output_file_name+'/autosklearn_regression_example_tmp',
+            output_folder=output_file_name+'/autosklearn_regression_example_out',
             delete_tmp_folder_after_terminate=True,
+            delete_output_folder_after_terminate=True,
             disable_evaluator_output=False,
-            memory_limit=3072,
+            ensemble_memory_limit=1024, ml_memory_limit= 3072,
             ensemble_nbest=50, seed = 1,
-            get_smac_object_callback=None,
+            exclude_estimators=None,exclude_preprocessors=None,get_smac_object_callback=None,
             initial_configurations_via_metalearning=25,
             logging_config=None, metadata_directory = None,
-            n_jobs= None, smac_scenario_args= None,
-            metric=autosklearn.metrics.mean_squared_error,scoring_functions=[autosklearn.metrics.r2,autosklearn.metrics.mean_squared_error])
+            n_jobs= None, smac_scenario_args= None,metric=autosklearn.metrics.mean_squared_error) #max_models_on_disc not included in version 0.5.2
     
-    estimator.fit(X=X_train.copy(), y=y_train.copy(),X_test=X_test.copy(),y_test=y_test.copy(),feat_type=feat_type)
-    # estimator.fit_ensemble(y_train.copy(), task=None, precision=32, dataset_name=None, ensemble_nbest=None, ensemble_size=ensemble_size)
-    # estimator.refit(X_train.copy(), y_train.copy())
+    estimator.fit(X_train.copy(), y_train.copy(),feat_type=feat_type)
+    estimator.refit(X_train.copy(), y_train.copy())
     
     logging_file.write("Get parameters:\n"+str(estimator.get_params())+"\n\n")
     logging_file.write("Show models: \n"+str(estimator.show_models())+"\n\n")
@@ -307,15 +309,15 @@ def main():
     
     
     import pickle
-    pickle.dump(estimator, open(output_file_name+"/trained_automl.pkl", 'wb'))
+    # pickle.dump(estimator, open(output_file_name+"/trained_automl.pkl", 'wb'))
     for i, (weight, pipeline) in enumerate(estimator.get_models_with_weights()):
         for stage_name, component in pipeline.named_steps.items():
             print(stage_name)
-            if stage_name != "feature_preprocessor":
-                if stage_name =='data_preprocessor':
-                    pickle.dump(component, open(output_file_name+"/%s.pkl"%stage_name, 'wb'))
-                else:
-                    pickle.dump(component.choice, open(output_file_name+"/%s.pkl"%stage_name, 'wb'))
+            if stage_name =='data_preprocessing':
+                pickle.dump(component, open(output_file_name+"/%s.pkl"%stage_name, 'wb'))
+                logging_file.write("{0}:\n {1} : {2}\n".format(stage_name,component,component.get_params()))
+            else:
+                pickle.dump(component.choice, open(output_file_name+"/%s.pkl"%stage_name, 'wb'))
                 
                 logging_file.write("{0}:\n {1} : {2}\n".format(stage_name,component.choice,component.choice.get_params()))
     logging_file.close()

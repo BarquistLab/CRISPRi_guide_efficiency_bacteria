@@ -58,9 +58,9 @@ Which datasets to use:
     0,1,2: all 3 datasets
 default: 0,1,2""")
 parser.add_argument("-o", "--output", default="results", help="output folder name. default: results")
-parser.add_argument("-c", "--choice", default="rf", help="If train on random forest or LASSO or Pasteur model, rf/lasso/pasteur. default: rf")
+parser.add_argument("-c", "--choice", default="pasteur", help="If train on random forest or LASSO or Pasteur model, rf/lasso/pasteur. default: pasteur")
 parser.add_argument("-s", "--split", default='gene', help="train-test split stratege. gene/gene_dropdistance. gene_dropdistance: To test the models without distance associated features. default: gene")
-parser.add_argument("-F", "--feature_set", default='all',type=str, help="feature set for training. all/pasteur. all: 128 guide features; pasteur: sequence features used for Pasteur model. default: all")
+parser.add_argument("-F", "--feature_set", default='pasteur',type=str, help="feature set for training. all/pasteur. all: 128 guide features; pasteur: sequence features used for Pasteur model. default: pasteur")
 parser.add_argument("-f","--folds", type=int, default=10, help="Fold of cross validation, default: 10")
 parser.add_argument("-t","--test_size", type=float, default=0.2, help="Test size for spliting datasets, default: 0.2")
 parser.add_argument("-r","--random_seed", type=int, default=111, help="random seed for train-test split, default: 111")
@@ -362,6 +362,7 @@ def datafusion_scaling(df):
             df.at[j,'activity']=median-df['scaled_log2FC'][j]
     return df
 def main():
+    open(output_file_name + '/log.txt','a').write(time.asctime())
     open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
     open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)
     df1=pandas.read_csv(datasets[0],sep="\t")

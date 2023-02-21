@@ -217,6 +217,7 @@ def SHAP(estimator,X,headers):
 
 
 def main():
+    open(output_file_name + '/log.txt','a').write(time.asctime())
     open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
     open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)
     df1=pandas.read_csv(datasets[0],sep="\t")

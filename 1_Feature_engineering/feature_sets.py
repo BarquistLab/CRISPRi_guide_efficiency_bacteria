@@ -211,6 +211,7 @@ def SHAP(estimator,X,y,headers):
         plt.close()    
 
 def main():
+    open(output_file_name + '/log.txt','a').write(time.asctime())
     open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
     open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)
     # load 3 datesets

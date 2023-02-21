@@ -104,6 +104,7 @@ except:
     else:
         print("Please input valid choice..\nAbort.")
         sys.exit()
+open(output_file_name + '/log.txt','a').write(time.asctime())
 open(output_file_name + '/log.txt','a').write("Python script: %s\n"%sys.argv[0])
 open(output_file_name + '/log.txt','a').write("Parsed arguments: %s\n\n"%args)    
 datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']

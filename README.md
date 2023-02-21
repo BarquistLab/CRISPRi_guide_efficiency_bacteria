@@ -62,17 +62,16 @@ All scripts were written in Python (version 3.8). To install all Python dependen
   |Name             |      Version       |           
   |-----------------|--------------------|
   |python           |       3.8.12       | 
-  |auto-sklearn     |       0.15.0       | 
-  |scikit-learn     |       0.24.0       |
+  |auto-sklearn     |       0.10.0       | 
+  |scikit-learn     |       0.22.2       |
   |shap             |       0.39         | 
-  |numpy            |       1.20.3       | 
+  |numpy            |       1.19.2       | 
   |merf             |       1.0          |
   |matplotlib       |       3.5.0        |  
-  |seaborn          |       0.11.2       |
-  |pandas           |       1.5.2        |
+  |seaborn          |       0.12.2       |
+  |pandas           |       0.25.3       |
   |scipy            |       1.10.0       |
   |biopython        |       1.78         | 
-  |h2o              |       3.38.0.4     |
   |pytorch          |       1.8.1        |
   |pytorch-lightning|       1.5.10       |
 
