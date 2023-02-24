@@ -81,11 +81,8 @@ except:
     else:
         print("Please input valid choice..\nAbort.")
         sys.exit()
-datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
+datasets=['../0_Datasets/E75_Rousset_crisproff.csv','../0_Datasets/E18_Cui_crisproff.csv','../0_Datasets/Wang_dataset_crisproff.csv']
 ### test crisprioff energy features
-datasets=["/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/E75_Rousset_crisproff.csv",
-          "/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/E18_Cui_crisproff.csv",
-          "/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/Wang_dataset_crisproff.csv"]
 
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
 

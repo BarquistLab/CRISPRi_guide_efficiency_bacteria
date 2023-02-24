@@ -89,12 +89,9 @@ except:
     else:
         print("Please input valid choice..\nAbort.")
         sys.exit()
-datasets=['../0_Datasets/E75_Rousset.csv','../0_Datasets/E18_Cui.csv','../0_Datasets/Wang_dataset.csv']
+datasets=['../0_Datasets/E75_Rousset_crisproff.csv','../0_Datasets/E18_Cui_crisproff.csv','../0_Datasets/Wang_dataset_crisproff.csv']
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
 ### test crisprioff energy features
-datasets=["/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/E75_Rousset_crisproff.csv",
-          "/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/E18_Cui_crisproff.csv",
-          "/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/Datasets/Wang_dataset_crisproff.csv"]
 def self_encode(sequence):#one-hot encoding for single nucleotide features
     integer_encoded=np.zeros([len(sequence),4],dtype=np.float64)
     nts=['A','T','C','G']
@@ -146,99 +143,7 @@ def DataFrame_input(df):
     df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from each datasets
     logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
     
-    # import scipy
-    # print(time.asctime(),'Preprocessing...')
-    # r75=df[df['dataset']==0]
-    # c18=df[df['dataset']==1]
-    # r75.index=r75['sequence']
-    # r75=r75.loc[c18['sequence']]
-    # c18.index=c18['sequence']
-    # scaled_log2FC_rc=dict()
-    # for i in r75.index:
-    #     scaled_log2FC_rc[i]=np.mean([r75['log2FC'][i],c18['log2FC'][i]])
-    # for i in df.index:
-    #     if df['dataset'][i] in [0,1]:
-    #         df.at[i,'scaled_log2FC']=scaled_log2FC_rc[df['sequence'][i]]
-    # logging_file.write("Number of guides in E75 Rousset/E18 Cui: %s \n" % r75.shape[0])        
-    # w=df[df['dataset']==2]
-    # r75=df[df['dataset']==0]
-    # w_overlap_log2fc=list()
-    # r_overlap_log2fc=list()
-    # w_overlap_seq=list()
-    # for gene in list(set(w['geneid'])):
-    #     if gene in list(r75['geneid']):
-    #         w_gene=w[w['geneid']==gene]
-    #         r_gene=r75[r75['geneid']==gene]
-    #         overlap_pos=[pos for pos in list(w_gene['distance_start_codon']) if pos in list(r_gene['distance_start_codon'])]
-    #         if len(overlap_pos)==0:
-    #             continue
-    #         for pos in overlap_pos:
-    #             w_pos=w_gene[w_gene['distance_start_codon']==pos]
-    #             r_pos=r_gene[r_gene['distance_start_codon']==pos]
-    #             w_overlap_log2fc.append(sum(w_pos['log2FC']))
-    #             r_overlap_log2fc.append(sum(r_pos['scaled_log2FC']))
-    #             w_overlap_seq.append(list(w_pos['sequence'])[0])
-    # slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(w_overlap_log2fc,r_overlap_log2fc) 
-    # logging_file.write("Number of guides in Wang: %s \n" % w.shape[0]) 
-    # logging_file.write("Number of overlapping guides between Wang and Rousset/Cui: %s \n" % len(w_overlap_log2fc))  
-    # logging_file.write("Slope and intercept of the regression line between logFC of Wang and averaged logFC of Rousset and Cui: %s , %s \n" % (round(slope,6),round(intercept,6)))      
-    
-    # slope=round(slope,6)
-    # intercept=round(intercept,6)
-    
-    # plt.scatter(w_overlap_log2fc,r_overlap_log2fc,color='skyblue',edgecolors='white')
-    # plt.plot(w_overlap_log2fc,np.array(w_overlap_log2fc)*slope+intercept,color='red')
-    # plt.xlabel("logFC in Wang")
-    # plt.ylabel("average logFC of E75 Rousset and E18 Cui")
-    # plt.title("N = "+str(len(w_overlap_log2fc)))
-    # plt.savefig(output_file_name+'/regress_wang.svg',dpi=150)
-    # plt.close()
-        
-    # for i in df.index:
-    #     if df['dataset'][i] in [0,1]:
-    #         if df['dataset'][i]==0:
-    #             df.at[i,'training']=1
-    #         else:
-    #             df.at[i,'training']=0
-    #     else:
-    #         df.at[i,'scaled_log2FC']=df['log2FC'][i]*slope+intercept
-    #         if df['sequence'][i] not in w_overlap_seq:
-    #             df.at[i,'training']=1
-    #         else:
-    #             df.at[i,'training']=0
-    
-    # for i in range(3):
-    #     sns.distplot(df[df['dataset']==i]['activity_score'],label=dataset_labels[i],hist=False)
-    # plt.legend()
-    # plt.xlabel("Activity scores (before scaling)")
-    # plt.savefig(output_file_name+"/activity_score_before.svg", dpi=150)
-    # plt.close()
 
-    # #calculate the activity scores for each gene in 3 datasets based on scaled logFC
-    # for i in list(set(df['geneid'])):
-    #     gene_df=df[df['geneid']==i]
-    #     median=statistics.median(gene_df['scaled_log2FC'])
-    #     for j in gene_df.index:
-    #         df.at[j,'median']=median
-    #         df.at[j,'activity_score']=median-df['scaled_log2FC'][j]
-    
-    # for i in range(3):
-    #     sns.distplot(df[df['dataset']==i]['scaled_log2FC'],label=dataset_labels[i],hist=False)
-    # plt.legend()
-    # plt.xlabel("Scaled logFC")
-    # plt.savefig(output_file_name+"/scaled_log2fc.png", dpi=150)
-    # plt.close()
-    
-    # for i in range(3):
-    #     sns.distplot(df[df['dataset']==i]['activity_score'],label=dataset_labels[i],hist=False)
-    # plt.legend()
-    # plt.xlabel("Activity scores (after scaling)")
-    # plt.savefig(output_file_name+"/activity_score_after.svg", dpi=150)
-    # plt.close()
-    
-    # training_tag=list(df['training'])
-    # scaled_log2FC=np.array(df['scaled_log2FC'],dtype=float)
-    # print(time.asctime(),'Done preprocessing...')
     geneids=list(df['geneid'])
     sequences=list(df['sequence'])
     log2FC=np.array(df['log2FC'],dtype=float)
