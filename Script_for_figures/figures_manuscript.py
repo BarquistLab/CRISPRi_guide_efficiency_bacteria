@@ -77,11 +77,12 @@ for test in ["only_seq","add_distance","add_MFE","only_guide",'guide_geneid','ge
 D=pandas.DataFrame(D)
 D.to_csv("figure1B.csv",sep='\t',index=False)
 #%%
-#Figure 1B /S9
+#
 '''
+Figure 1B 
 I saved the results to the summplementary tables and plotted from the excel sheets
 '''
-df=pandas.read_excel("Yu_CRISPRi_supplementary_tables_YYu_v3.3.xlsx",sheet_name="TableS3_feature_engineering")
+df=pandas.read_excel("Yu_CRISPRi_supplementary_tables_YYu_v3.5.xlsx",sheet_name="TableS3_feature_engineering")
 
 for f in ['1B']:
     headers=df.columns.values.tolist()
@@ -94,27 +95,89 @@ for f in ['1B']:
         
     ### Change the list according to the results included in the excel sheet
     for i in ['Sequence features', '+ distance features', '+ thermodynamic features', '128 guide features',
-              '128 guide features + target gene',#'Sequence + gene features (geneID)','137 guide + gene features (geneID)',
-              'Sequence + gene features','137 guide + gene features','+ deltaGB','134 guide+gene (deltaGB)']:
+              '128 guide features + target gene',
+              'Sequence + gene features','137 guide + gene features']:
         plot['test']+=[i]*10
     for key in plot.keys():
         print(len(plot[key]))
     sns.set_style("whitegrid")
     plot=pandas.DataFrame.from_dict(plot)
-    if f=='1B':
-        plot=plot[~plot['test'].isin(['+ deltaGB','134 guide+gene (deltaGB)'])]
-    else:
-        plot=plot[plot['test'].isin(['+ deltaGB','134 guide+gene (deltaGB)'])]
-        plt.figure(figsize=(3,4))
     pal=sns.color_palette('Set2')
     ax=sns.boxplot(data=plot,x='test',y='value',color=pal.as_hex()[1])#
     plt.xticks(fontsize=12, rotation=30)
     plt.xlabel("")
     plt.ylabel("Spearman correlation")
-    # plt.subplots_adjust(bottom=0.25)
     plt.savefig("Figure%s.svg"%f)
     plt.show()
     plt.close()
+#%%
+'''
+Figure S2
+'''
+def overlapping_guides(training_df,validation_df,set1,set2):
+    pal=sns.color_palette("pastel")
+    training_df=training_df[(training_df['gene_essentiality']==1)&(training_df['intergenic']==0)&(training_df['coding_strand']==1)]
+    training_df=training_df.dropna()
+    validation_df=validation_df[(validation_df['gene_essentiality']==1)&(validation_df['intergenic']==0)&(validation_df['coding_strand']==1)]
+    validation_df=validation_df.dropna()
+    print(validation_df.shape)
+    for i in list(set(training_df['geneid'])):
+        gene_df=training_df[training_df['geneid']==i]
+        for j in gene_df.index:
+            training_df.at[j,'nr']=gene_df.shape[0]
+    for i in list(set(validation_df['geneid'])):
+        gene_df=validation_df[validation_df['geneid']==i]
+        for j in gene_df.index:
+            validation_df.at[j,'nr']=gene_df.shape[0]
+    training_ess=list(set(training_df['geneid']))
+    validation_ess=list(set(validation_df['geneid']))
+    overlap_ess=[ess for ess in training_ess if ess in validation_ess]
+    print(len(overlap_ess))
+    t_overlap_log2fc=[]
+    v_overlap_log2fc=[]
+    overlapping_guides=0
+    for ess in overlap_ess:
+        t=training_df[training_df['geneid']==ess]
+        v=validation_df[validation_df['geneid']==ess]
+        overlap_pos=[pos for pos in list(t['distance_start_codon']) if pos in list(v['distance_start_codon'])]
+        overlapping_guides+=len(overlap_pos)
+        if len(overlap_pos)==0:
+            continue
+        for pos in overlap_pos:
+            t_pos=t[t['distance_start_codon']==pos]
+            v_pos=v[v['distance_start_codon']==pos]
+            t_overlap_log2fc.append(sum(t_pos['log2FC']))
+            v_overlap_log2fc.append(sum(v_pos['log2FC']))
+    r,_=pearsonr(t_overlap_log2fc,v_overlap_log2fc)
+    print(r,overlapping_guides)
+    sns.set_style('white')
+    plt.figure()
+    ax=sns.scatterplot(t_overlap_log2fc,v_overlap_log2fc,alpha=0.5,edgecolors='w',color=pal.as_hex()[0])
+    plt.text(0.01,0.85,"N = {0}".format(len(t_overlap_log2fc)),fontsize=14,transform=ax.transAxes)
+    plt.text(0.01,0.8,"Pearson R: {0}".format(round(r,2)),fontsize=14,transform=ax.transAxes)
+    plt.xlabel("logFC in %s"%set1)
+    plt.ylabel("logFC in %s"%set2)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    # plt.savefig("%s_%s.svg"%(set1,set2))
+    plt.show()
+    plt.close()
+path="~/Projects/CRISPRi_related/doc/CRISPRi_manuscript/github_code"
+folds=10
+datasets=[path+'/0_Datasets/E75_Rousset.csv',path+'/0_Datasets/E18_Cui.csv',path+'/0_Datasets/Wang_dataset.csv']
+rousset=pandas.read_csv(datasets[0],sep="\t")
+rousset = rousset.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
+rousset['dataset']=[0]*rousset.shape[0]
+rousset18=pandas.read_csv(datasets[1],sep="\t")
+rousset18 = rousset18.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
+rousset18['dataset']=[1]*rousset18.shape[0]
+wang=pandas.read_csv(datasets[2],sep="\t")
+wang = wang.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
+wang['dataset']=[2]*wang.shape[0]
+overlapping_guides(rousset,wang,'E75 Roussset','Wang')    
+overlapping_guides(rousset18,wang,'E18 Cui','Wang')    
+overlapping_guides(rousset,rousset18,'E75 Roussset','E18 Cui')   
+
 #%%
 '''
 Figure 1D
@@ -124,12 +187,10 @@ def DataFrame_input(df):
     ###keep guides for essential genes
     df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==1)]
     df=df.dropna()
-    for dataset in range(len(set(df['dataset']))):
-        dataset_df=df[df['dataset']==dataset]
-        for i in list(set(dataset_df['geneid'])):
-            gene_df=dataset_df[dataset_df['geneid']==i]
-            for j in gene_df.index:
-                df.at[j,'Nr_guide']=gene_df.shape[0]
+    for i in list(set(list(df['geneid']))):
+        df_gene=df[df['geneid']==i]
+        for j in df_gene.index:
+            df.at[j,'Nr_guide']=df_gene.shape[0]
     df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from each dataset
     plt.figure(figsize=(6,4))
     sns.set_style("whitegrid")
@@ -140,7 +201,6 @@ def DataFrame_input(df):
     sns.distplot(a=essential1['log2FC'],hist=False,kde=True,rug=False,kde_kws={"shade":False, "bw":0.2},label ='E75 Rousset (%s gRNAs)'%len(essential1))
     sns.distplot(a=essential2['log2FC'],hist=False,kde=True,rug=False,kde_kws={"shade":False, "bw":0.2},label ='E18 Cui (%s gRNAs)'%len(essential2))
     sns.distplot(a=essential3['log2FC'],hist=False,kde=True,rug=False,kde_kws={"shade":False, "bw":0.2},label ='Wang (%s gRNAs)'%len(essential3))
-    # plt.xlim(-25,8)
     plt.legend(loc='upper right',fontsize=11)
     plt.xlabel("logFC",fontsize=14)
     plt.ylabel("Proportion",fontsize=14)
@@ -176,7 +236,7 @@ Figure 1E
 Similar to Figure 1B
 '''
 ###collect results for figure 2 into a table
-for alg in ['LR','LASSO','ElasticNet','SVR','RF','HistGB','LASSO_MS','RF_MS','autosklearn']:
+for alg in ['LR','LASSO','ElasticNet','SVR','RF','HistGB','autosklearn']:
     D=np.zeros((10,1))    
     for test in ['R75','C18','W','R75C18','R75W','C18W','3sets']:
         try:
@@ -199,26 +259,28 @@ for alg in ['LR','LASSO','ElasticNet','SVR','RF','HistGB','LASSO_MS','RF_MS','au
 
 
 #%%
-#Figure 1E 
+'''
+#Figure 1E & S3
+'''
 groug_num=5
-
-### Other tested model types shown in supplement figures
-# algs= ['Linear Regression','LASSO','Elastic Net','SVR','RF','HistGB','LASSO (gene-wise split)','RF (gene-wise split)']
-# df=pandas.read_excel("Yu_CRISPRi_supplementary_tables_YYu_v3.3.xlsx",sheet_name="TableS6_datafusion_modeltype")
-# headers=df.columns.values.tolist()
-# headers.remove('Model type')
-# headers.remove('train')
-
-### autosklearn-selected models
-algs=['autosklearn']
-df=pandas.read_excel("Yu_CRISPRi_supplementary_tables_YYu_v3.3.xlsx",sheet_name="TableS5_data_fusion")
-headers.remove('Fold')
+if fig!='1E':
+    algs= ['Linear Regression','LASSO','Elastic Net','SVR','RF','HistGB']
+    df=pandas.read_excel("Yu_CRISPRi_supplementary_tables_YYu_v3.5.xlsx",sheet_name="TableS6_datafusion_modeltype")
+    headers=df.columns.values.tolist()
+    headers.remove('Model type')
+    headers.remove('train')
+    rotation=30
+else:
+    algs=['autosklearn']
+    df=pandas.read_excel("Yu_CRISPRi_supplementary_tables_YYu_v3.5.xlsx",sheet_name="TableS5_data_fusion")
+    headers=df.columns.values.tolist()
+    headers.remove('Fold')
+    rotation=0
 
 
 sns.set_style('whitegrid')
 
 for alg in algs:
-    # print(df.loc[1+algs.index(alg)*15:10+algs.index(alg)*15])
     plot=defaultdict(list)
     for i in range(0,len(headers),groug_num):
         for j in range(groug_num):
@@ -226,7 +288,7 @@ for alg in algs:
             plot['group']+=[df.loc[0,headers[i+j]]]*10
     for i in ['E75 Rousset','E18 Cui', 'Wang', 
              'E75 Rousset & E18 Cui', 'E75 Rousset & Wang', 'E18 Cui & Wang', 
-              '3 datasets','3 datasets (deltaGB)','H2O']: #,'train on mixed\n(guide features)','train on 3 datasets\n(574 features)' ,'3 datasets (CAI)'
+              '3 datasets']: 
         plot['test']+=[i]*10*groug_num
     try:
         plot=pandas.DataFrame.from_dict(plot)
@@ -235,20 +297,20 @@ for alg in algs:
             print(len(plot[key]))
     
     plot=plot[plot['group']!='Test']
-    # plot=plot[plot['test']=='3 datasets (deltaGB)']
-    plot=plot[plot['test'].isin(['E75 Rousset','E18 Cui', 'Wang', '3 datasets'])]
-    # plot=plot[plot['test'].isin(['E75 Rousset & E18 Cui', 'E75 Rousset & Wang', 'E18 Cui & Wang','H2O'])]
-    plt.figure(figsize=(5,3))
+    if fig=='1E':
+        plot=plot[plot['test'].isin(['E75 Rousset','E18 Cui', 'Wang', '3 datasets'])]
+        plt.figure(figsize=(5,3))
+    else:
+        plt.figure(figsize=(6,3))
     sns.set_palette("Set2")
     ax=sns.boxplot(data=plot,x='test',y='value',hue='group')#
-    # ax=sns.boxplot(data=plot,x='group',y='value')
     legend=plt.legend(loc='lower right',fontsize=8,title="")
-    # ax.legend().remove()
-    # ax.grid(True)
+    if fig !='1E':
+        ax.legend().remove()
+        plt.title(alg,fontsize=14)
     plt.xticks(fontsize=10,  rotation=0)
     plt.xlabel("")
     plt.ylabel("Spearman correlation",fontsize=14)
-    # plt.title(alg,fontsize=14)
     plt.savefig("%s.svg"%alg.replace(" ","_"))
     plt.show()
     plt.close()
@@ -266,21 +328,17 @@ from sklearn.metrics import ndcg_score
 from scipy.stats import rankdata
 from sklearn.preprocessing import MinMaxScaler
 algs=['MERF','Pasteur']
-xticks={'MERF':"MERF (RF)",
-        'LASSO':'MS (LASSO)','RF':'MS (RF)',
-        'CNN':'MS (CNN)','CRISPRon_deltaGB':'MS (CRISPRon deltaGB)','CRISPRon':'MS (CRISPRon)',
+xticks={'MERF':"MERF",
+        'CNN':'CNN','CRISPRon_deltaGB':'CGx_CRISPRi (deltaGB)','CRISPRon':'CGx_CRISPRi',
         'pasteur':'Pasteur','Pasteur':'Pasteur (retrained)'}
 dataset_labels= ['E75 Rousset','E18 Cui','Wang']
 training_labels={'R75':'E75 Rousset','C18':'E18 Cui','W': "Wang",
                     'R75W':'E75 Rousset & Wang','R75C18':'E75 Rousset & E18 Cui', 'C18W':'E18 Cui & Wang', '3sets': "3 datasets"}
 plot=defaultdict(list)
 for alg in algs:
-    if alg=='MERF' or alg=='MERF_noness':
-        
-        
-        # training_datasets=['3sets']
-        training_datasets=['R75','C18','W','R75W','3sets','3sets_deltaGB','3sets_rf','3sets_hist','3sets_dropdistance','3sets_CAI']
-    elif alg in ['RF','LASSO','Pasteur']:
+    if alg=='MERF':
+        training_datasets=['R75','C18','W','R75W','3sets','3sets_deltaGB','3sets_dropdistance','3sets_CAI']
+    elif alg in ['Pasteur']:
         training_datasets=['R75','C18','W','3sets']
     else:
         training_datasets=['3sets']
@@ -292,7 +350,7 @@ for alg in algs:
         elif alg=='CNN' or alg=='CRISPRon' or alg=='CRISPRon_deltaGB':
             df=pandas.read_csv("%s/iteration_predictions.csv"%(alg),sep='\t')
 
-        elif alg in ['RF','LASSO','Pasteur']:
+        elif alg =='Pasteur':
             df=pandas.read_csv("%s/%s/iteration_predictions.csv"%(alg,training_dataset),sep='\t')
         else:
             df=pandas.read_csv("%s/%s/iteration_predictions.csv"%(alg,training_dataset),sep='\t')
@@ -317,18 +375,14 @@ for alg in algs:
             for k in range(3):
                 c=0
                 D_dataset=D[D['dataset']==k]
-                
                 for j in list(set(D_dataset['geneid'])):
-                    
                     D_gene=D_dataset[D_dataset['geneid']==j]
                     if D_gene.shape[0]<5:
                         continue
-                    if 'MERF' in alg or  'GPB' in alg or 'hyper' in alg:
+                    if 'MERF' in alg:
                         sr,_=spearmanr(D_gene['log2FC'],D_gene['pred']) 
-                        
                     else:
                         sr,_=spearmanr(D_gene['log2FC'],-D_gene['pred']) 
-                    
                     plot['sr'].append(sr)
                     plot['gene'].append(j)
                     plot['alg'].append(xticks[alg])
@@ -340,9 +394,9 @@ plot_all=pandas.DataFrame.from_dict(plot)
 
 metrics=defaultdict(list)
 for alg in algs:
-    if alg=='MERF' or alg=='MERF_noness':
-        training_datasets=['R75','C18','W','R75W','3sets','3sets_deltaGB','3sets_rf','3sets_hist','3sets_dropdistance','3sets_CAI']
-    elif alg in ['RF','LASSO','Pasteur']:
+    if alg=='MERF' :
+        training_datasets=['R75','C18','W','R75W','3sets','3sets_deltaGB','3sets_dropdistance','3sets_CAI']
+    elif alg in ['Pasteur']:
         training_datasets=['R75','C18','W','3sets']
     for training_dataset in training_datasets:
         
@@ -359,7 +413,7 @@ for alg in algs:
 metrics=pandas.DataFrame.from_dict(metrics)
 metrics=metrics.dropna()
 print(metrics)
-# metrics=metrics.sort_values(by='Training datasets')
+metrics=metrics.sort_values(by='Training datasets')
 metrics.to_csv("sr_heldout_median.csv",sep='\t',index=False)
 #%%
 '''
@@ -413,7 +467,7 @@ https://tableconvert.com/excel-to-latex
         \multirow{4}{*}{\bfseries MERF} & E75 Rousset & 0.331 & 0.333 & 0.257 & 0.301 \\ 
          & E18 Cui & 0.371 & 0.400 & 0.283 & 0.329 \\ 
          & Wang & 0.357 & 0.400 & 0.336 & 0.357 \\ 
-         & 3 datasets & \bfseries 0.406 & \bfseries 0.429 & \bfseries0.371 & \bfseries0.393 \\ 
+         & 3 datasets & \bfseries 0.406 & \bfseries 0.429 & \bfseries0.371 & \bfseries0.393 \\ \hline
         \multirow{4}{*}{\bfseries Pasteur (retrained)} & E75 Rousset & 0.333 & 0.333 & 0.256 & 0.310 \\ 
         & E18 Cui & 0.363 & 0.352 & 0.286 & 0.322 \\ 
          & Wang & 0.367 & 0.377 & 0.307 & 0.339 \\ 
@@ -554,7 +608,7 @@ def DataFrame_input(df):
     df=pandas.DataFrame(data=np.c_[df,sequence_encoded],columns=headers)
     return df
 labels={'MERF':"MERF",
-        'LASSO':'MS (LASSO)','RF':'MS (RF)','CRISPRon':'MS (CRISPRon)','CNN':'MS (CNN)', 'CRISPRon_deltaGB': 'MS (CRISPRon deltaGB)',
+        'CRISPRon':'CGx_CRISPRi','CNN':'CNN', 'CRISPRon_deltaGB': 'CGx_CRISPRi (deltaGB)',
         'pasteur_score':'Pasteur','Pasteur':'Pasteur (retrained)',
         'Doench_score(with aa)':"gRNA Designer",'Doench_score(without aa)':"Doench (w/o aa)",
         'DeepSpCas9':"DeepSpCas9",'TUSCAN':"TUSCAN","SSC":"SSC" }
@@ -637,13 +691,9 @@ for alg in algs:
     else:
         if alg=='Pasteur':
             datasets=['3sets']
-        elif alg=='MERF_pasteur':
-            datasets=['3sets']
-        for dataset in datasets:#,'R75','C18','W']:#,'R75','C18','W']:#'R75W','R75C18','C18W',,'3sets_dataset'
+        for dataset in datasets:
             if alg=='Pasteur':
                 estimator=pickle.load(open("%s/%s/saved_model/CRISPRi_model.sav"%(alg,dataset),'rb'))
-            elif alg=='MERF_pasteur':
-                estimator=pickle.load(open("%s/saved_model/CRISPRi_model.sav"%(alg),'rb'))
             training_seq=list(df['seq_60nt'])
             training_seq=encode_seqarr(training_seq,list(range(34,41))+list(range(43,59)))
             training_seq=training_seq.reshape(training_seq.shape[0],-1)
@@ -739,10 +789,7 @@ for alg in algs:
     if 'Pasteur' not in alg and 'pasteur' not in alg and alg not in ['CRISPRon','CNN']:
         if alg=='MERF':
             datasets=['3sets']
-            # datasets=['R75','C18','W','R75W','3sets','3sets_rf','3sets_hist','3sets_deltaGB','3sets_dropdistance','3sets_CAI'] 
-        elif alg in  ['RF','LASSO']:
-            datasets=['3sets']
-        for dataset in datasets:#,'R75','C18','W']:#'R75W','R75C18','C18W',,'3sets_dataset'
+        for dataset in datasets:
             estimator=pickle.load(open("%s/%s/saved_model/CRISPRi_model.sav"%(alg,dataset),'rb'))
             headers=pickle.load(open("%s/%s/saved_model/CRISPRi_headers.sav"%(alg,dataset),'rb'))
             df_sub=df[headers]
@@ -901,24 +948,34 @@ ax.spines['left'].set_visible(False)
 plt.show()
 plt.close()
 #%%
-
-
+'''
+Purine screen
+'''
 df=pandas.read_csv("pur_gRNAs.csv",sep='\t')
+###
 '''
-### The minimum logFC in each gene in each timepoint
-for OD in ['OD02','OD06','OD1']:#
-    test=OD+"_edgeR.batch"
-    print(OD)
-    for gene in genes:
-        df_gene=df[df['gene_name']==gene]
-        df_gene=df_gene.dropna(subset=[test])
-        print(gene, min(df_gene[test]))
+S6A
 '''
-
-algs=['MERF','Pasteur']#['RF','LASSO','CRISPRon','CNN']
-sr_plot='5B'
-ppv_plot='5D'
-perc_plot='5C'
+df=pandas.melt(df,id_vars=['gene_name'],value_vars=["OD02_edgeR.batch","OD06_edgeR.batch","OD1_edgeR.batch"])
+print(df)
+df=df.replace({"OD02_edgeR.batch":"OD 0.2","OD06_edgeR.batch":"OD 0.6","OD1_edgeR.batch":"OD 1"})
+plt.figure(figsize=(6,4))
+sns.set_palette('PuBu',3)
+sns.boxplot(data=df,x='gene_name',y='value',hue='variable')
+plt.legend(title="",loc='lower left')
+plt.xlabel("")
+plt.ylabel("logFC")
+plt.savefig("S6A.svg",dpi=400)
+plt.show()
+plt.close()
+###
+'''
+Figure 4B-D
+'''
+algs=['MERF','Pasteur']
+sr_plot='4B'
+ppv_plot='4D'
+perc_plot='4C'
 ppv=5
 pasteur_ori=True
 tests=list()
@@ -927,8 +984,6 @@ df_sub=DataFrame_input(df)
 for alg in algs:
     if 'Pasteur' not in alg and 'pasteur' not in alg and alg not in ['CRISPRon','CNN','CRISPRon_deltaGB']:
         if alg=='MERF':
-            datasets=['3sets']
-        elif alg in  ['RF','LASSO']:
             datasets=['3sets']
         for dataset in datasets:
             estimator=pickle.load(open("%s/%s/saved_model/CRISPRi_model.sav"%(alg,dataset),'rb'))
@@ -940,16 +995,9 @@ for alg in algs:
                 if 'dropdistance' in dataset:
                     dataset="Drop distance"
                 elif 'CAI' in dataset:
-                    if dataset=='3sets_CAI':
-                        dataset='CAI'
-                    else:
-                        dataset='wo CAI'
+                    dataset='CAI'
                 elif 'deltaGB' in dataset:
                     dataset='deltaGB'
-                elif 'rf' in dataset:
-                    dataset='RF (autoML)'
-                elif 'hist' in dataset:
-                    dataset='HistGB (autoML)'
                 df[alg+"("+dataset+")"]=predictions
                 labels.update({alg+"("+dataset+")":labels[alg]+" ("+dataset+")"})
                 tests.append(alg+"("+dataset+")")
@@ -1028,40 +1076,6 @@ genes=list(set(df['gene_name']))
 genes.sort()
 correlations=defaultdict(list)
 
-'''
-### Rank of the predictions vs logFC
-for prediction in tests:
-    sns.set_palette('PuBu',3)
-    fig, axes=plt.subplots(3,3)
-    for gene in genes:
-        df_gene=df[df['gene_name']==gene]
-        if 'MERF' in prediction:
-            df_gene=df_gene.sort_values(by=prediction,ascending=True).reset_index(drop=True)
-        else:
-            df_gene=df_gene.sort_values(by=prediction,ascending=False).reset_index(drop=True)
-        df_gene['Rank#']=list(df_gene.index+1)
-        for OD in ['OD02','OD06','OD1']:#
-            test=OD+"_edgeR.batch"
-            df_gene=df_gene.dropna(subset=[test])
-            ax=sns.scatterplot(data=df_gene,x='Rank#',y=test,ax=axes[genes.index(gene)//3,genes.index(gene)%3],label=OD,alpha=0.7,s=7)
-        axes[genes.index(gene)//3,genes.index(gene)%3].set_title(gene,fontsize='x-small',pad=2.5)
-        axes[genes.index(gene)//3,genes.index(gene)%3].get_legend().remove()
-        axes[genes.index(gene)//3,genes.index(gene)%3].tick_params(labelsize=5,pad=-1.5)
-        axes[genes.index(gene)//3,genes.index(gene)%3].set_xlabel("")
-        axes[genes.index(gene)//3,genes.index(gene)%3].set_ylabel("")
-    plt.subplots_adjust(wspace=0.15,hspace=0.3)
-    fig.text(0.5, 0.01, 'Rank #', ha='center',fontsize='small')
-    fig.text(0.06, 0.5, 'Experimental logFC', va='center', rotation='vertical',fontsize='small')
-    handles, _ = ax.get_legend_handles_labels()
-    lgnd=fig.legend(handles[0:3], ['OD 0.2', 'OD 0.6', 'OD 1'], fontsize='xx-small',bbox_to_anchor=(0.25, 0.01, 0.5, 0.13),loc='center',
-            ncol=3)
-    lgnd.legendHandles[0]._sizes=[40]
-    lgnd.legendHandles[1]._sizes=[40]
-    lgnd.legendHandles[2]._sizes=[40]
-    plt.suptitle(labels[prediction])
-    plt.show()
-    plt.close()
-'''
 ###different metrics per gene per model
 for prediction in tests:
     for OD in ['OD02','OD06','OD1']:#
@@ -1112,7 +1126,7 @@ for test in ['spearmanr']:
     plt.legend(handles[:len(included_methods)], [labels[prediction] for prediction in predictions][:len(included_methods)],
                 fontsize=12, loc='center',
                 ncol=2,bbox_to_anchor=(0,-0.25, 1, .102))
-    # plt.savefig("%s.svg"%sr_plot,dpi=400)
+    plt.savefig("%s.svg"%sr_plot,dpi=400)
     plt.show()
     plt.close()  
 '''
@@ -1143,11 +1157,9 @@ for fold in [1.5,2,2.5,3,3.5,4,4.5,5]:
                 
                 top=np.max(true)
                 true=[1  if i >=(top/fold) else 0 for i in true]
-                # print(OD,gene,fold,true.count(1),df_gene.shape[0])
                 good_pred=list()
                 for i in range(ppv):
                     if i >true.count(1):
-                        # print(gene,fold)
                         break
                     good_pred.append(pred.index(sorted(pred,reverse=True)[i]))
                 pred=[1 if i in good_pred else 0 for i in range(len(pred))]
@@ -1160,10 +1172,8 @@ for fold in [1.5,2,2.5,3,3.5,4,4.5,5]:
             mccs.append(mcc)
             PPVs.append(PPV)
             gene_wise_corr['fold'].append(fold)
-            # gene_wise_corr['fold'].append(ppv)
             gene_wise_corr['OD'].append(OD)
             gene_wise_corr['method'].append(labels[prediction])
-            # gene_wise_corr['mcc'].append(mcc)
             gene_wise_corr['PPV'].append(PPV)
 gene_wise_corr=pandas.DataFrame.from_dict(gene_wise_corr)
 gene_wise_corr.to_csv("purine_PPV.csv",sep='\t',index=False)
@@ -1182,7 +1192,7 @@ for test in ['PPV']:
     plt.xlabel('Fold',fontsize=14)
     plt.legend(fontsize=12,title="",loc='lower right')#,bbox_to_anchor=(1,1))#
     plt.subplots_adjust(right=0.8)
-    # plt.savefig("%s.svg"%ppv_plot,dpi=400)
+    plt.savefig("%s.svg"%ppv_plot,dpi=400)
     plt.show()
     plt.close()  
 
@@ -1198,26 +1208,9 @@ for gene in genes:
         df_gene=df[df['gene_name']==gene]
         df_gene=df_gene.dropna(subset=[test])
         df_gene=df_gene.sort_values(by=test,ascending=True)
-        # print(gene,df_gene.shape[0]*perc,int(df_gene.shape[0]*perc))
         
         for i in df_gene.index:
             df.at[i,'percent_rank_'+OD]=(list(df_gene.index).index(i)+1)/df_gene.shape[0]
-
-'''
-df2=df.dropna(subset=['percent_rank_OD02','percent_rank_OD06','percent_rank_OD1'])
-stds=defaultdict(list)
-for i in df2.index:
-    stds['gene'].append(df2['gene_name'][i])
-    stds['min_max'].append(max([df2['percent_rank_OD02'][i],df2['percent_rank_OD06'][i],df2['percent_rank_OD1'][i]])-min([df2['percent_rank_OD02'][i],df2['percent_rank_OD06'][i],df2['percent_rank_OD1'][i]]))
-stds=pandas.DataFrame.from_dict(stds)
-sns.boxplot(data=stds,y='min_max',x='gene',color='steelblue')
-plt.ylabel("Differences in percent-rank\nacross time points")
-plt.xlabel("")
-plt.show()
-plt.close()
-
-'''
-
 for prediction in tests:
     for gene in genes:
         df_gene=df[df['gene_name']==gene]
@@ -1277,40 +1270,40 @@ for perc in [0.2]:
     plt.legend(handles[:len(included_methods)], [labels[prediction] for prediction in predictions][:len(included_methods)],
                 fontsize=12, loc='center',
                 ncol=2,bbox_to_anchor=(0,-0.25, 1, .102))
-    # plt.ylim(-0.5,0.7)
-    # plt.savefig("%s.svg"%perc_plot,dpi=400)
+    plt.savefig("%s.svg"%perc_plot,dpi=400)
     plt.show()
     plt.close()  
-    
 #%%
 '''
-### Figure S6 the scatterplot of MERF prediction versus measured logFC of purine screen
+Figure 4E & S6B
 '''
+#log2FC vs distance start codon
 df=pandas.read_csv("pur_gRNAs.csv",sep='\t')
-df_sub=DataFrame_input(df)
-alg='MERF'
-dataset='3sets'
-estimator=pickle.load(open("%s/%s/saved_model/CRISPRi_model.sav"%(alg,dataset),'rb'))
-headers=pickle.load(open("%s/%s/saved_model/CRISPRi_headers.sav"%(alg,dataset),'rb'))
-df_sub=DataFrame_input(df)
-df_sub=df_sub[headers]
-predictions=estimator.predict(df_sub)
-df[alg]=predictions
-for OD in ['OD02','OD06','OD1']:#
-    plt.figure(figsize=(9,3))
-    test=OD+"_edgeR.batch"
-    df_drop=df.dropna(subset=[test])
-    sns.set_style("white")
-    sns.scatterplot(df_drop[test],df_drop['MERF'],color=sns.color_palette('PuBu').as_hex()[-1],alpha=0.5)
-    sns.scatterplot(df_drop[df_drop['gene_name']=='purK'][test],df_drop[df_drop['gene_name']=='purK']['MERF'],color=sns.color_palette('Set2').as_hex()[0],label='purK',alpha=0.8)
-    sns.scatterplot(df_drop[df_drop['gene_name']=='purE'][test],df_drop[df_drop['gene_name']=='purE']['MERF'],color=sns.color_palette('Set2').as_hex()[1],label='purE',alpha=.8)
-    plt.legend()
-    plt.xlabel("Experimental logFC at "+['OD 0.2', 'OD 0.6', 'OD 1'][ ['OD02','OD06','OD1'].index(OD)])
-    plt.ylabel('Predicted scores from MERF')
-    plt.savefig("pur_global_scatter_%s.svg"%OD,dpi=400)
+sns.set_palette('PuBu',3)
+sns.set_style("white")
+fig, axes=plt.subplots(3,3)
+for gene in genes:
+    gene_df=df[(df['gene_name']==gene) ]
+    for OD in ['OD02','OD06','OD1']:#
+        test=OD+"_edgeR.batch"
+        ax=sns.regplot(data=gene_df,x='distance_start_codon',y=test,ax=axes[genes.index(gene)//3,genes.index(gene)%3],label=OD,line_kws={"linewidth":1},scatter_kws={"alpha":0.7,'s':1})
+    axes[genes.index(gene)//3,genes.index(gene)%3].set_title(gene,fontsize='small',pad=2.5)
+    axes[genes.index(gene)//3,genes.index(gene)%3].tick_params(labelsize=6,pad=-2.5)
+    axes[genes.index(gene)//3,genes.index(gene)%3].set_xlabel("")
+    axes[genes.index(gene)//3,genes.index(gene)%3].set_ylabel("")
+plt.subplots_adjust(wspace=0.15,hspace=0.3)
+fig.text(0.5, 0.01, 'Distance to start codon (bp)', ha='center',fontsize='small')
+fig.text(0.06, 0.5, 'logFC', va='center', rotation='vertical',fontsize='small')
+handles, labels = ax.get_legend_handles_labels()
+lgnd=fig.legend(handles[0:3], ['OD 0.2', 'OD 0.6', 'OD 1'], fontsize='xx-small',bbox_to_anchor=(0.22, 0.01, 0.5, 0.17),loc='center',
+       ncol=3)
+lgnd.legendHandles[0]._sizes=[40]
+lgnd.legendHandles[1]._sizes=[40]
+lgnd.legendHandles[2]._sizes=[40]
+plt.savefig("distance_logFC.svg")
+plt.show()
+plt.close()    
 
-    plt.show()
-    plt.close()
     
 #%%
 '''
@@ -1324,12 +1317,18 @@ def DataFrame_input(df,split):
     ###keep guides for essential genes
     df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==1)]
     df=df.dropna()
-    for dataset in range(len(set(df['dataset']))):
-        dataset_df=df[df['dataset']==dataset]
-        for i in list(set(dataset_df['geneid'])):
-            gene_df=dataset_df[dataset_df['geneid']==i]
-            for j in gene_df.index:
-                df.at[j,'Nr_guide']=gene_df.shape[0]
+    if split=='guide':
+        for i in list(set(list(df['geneid']))):
+            df_gene=df[df['geneid']==i]
+            for j in df_gene.index:
+                df.at[j,'Nr_guide']=df_gene.shape[0]
+    elif split=='gene':
+        for dataset in range(len(set(df['dataset']))):
+            dataset_df=df[df['dataset']==dataset]
+            for i in list(set(dataset_df['geneid'])):
+                gene_df=dataset_df[dataset_df['geneid']==i]
+                for j in gene_df.index:
+                    df.at[j,'Nr_guide']=gene_df.shape[0]
     df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
     print(df.shape)
     sequences=list(dict.fromkeys(df['sequence']))
@@ -1361,8 +1360,6 @@ training_df=df1.append(df2,ignore_index=True)
 training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
 #dropping unnecessary features and encode sequence features
 X_df,guideids, guide_sequence_set=DataFrame_input(training_df,'guide')
-print(len(guide_sequence_set))
-
 '''
 ###save unique sequences 
 '''
@@ -1397,12 +1394,9 @@ X_df,guideids, guide_sequence_set=DataFrame_input(training_df,'guide')
 guide_sequence_set=open("unique_30nt_guides.txt","r")
 guide_sequence_set=guide_sequence_set.readlines()
 guide_sequence_set=[i.strip() for i in guide_sequence_set]
-print(len(guide_sequence_set))
-print(len(set(X_df['geneid'])))
 #k-fold cross validation
 training_set_list={tuple([0]): "E75 Rousset",tuple([1]): "E18 Cui",tuple([2]): "Wang", tuple([0,1]): "E75 Rousset & E18 Cui", tuple([0,2]): "E75 Rousset & Wang",  tuple([1,2]): "E18 Cui & Wang",tuple([0,1,2]): "all 3 datasets"}
 guideid_set=list(set(guideids))
-print(len(guideid_set))
 plot=defaultdict(list)
 fold=0
 size=defaultdict(list)
@@ -1502,18 +1496,14 @@ X_df,guideids, guide_sequence_set=DataFrame_input(training_df,'guide')
 guide_sequence_set=open("unique_30nt_guides.txt","r")
 guide_sequence_set=guide_sequence_set.readlines()
 guide_sequence_set=[i.strip() for i in guide_sequence_set]
-print(len(guide_sequence_set))
 training_sets=[0,1,2]
 guideid_set=list(set(guideids))
-print(len(guideid_set))
 plot=defaultdict(list)
-print(training_set_list[tuple(training_sets)])
 guideid_set=list(set(guideids))
 kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
 fold=0
 test_inds=[tuple(i[1]) for i in kf.split(guideid_set)]
 combs=list(itertools.combinations(test_inds,2))
-# print(combs)
 size=defaultdict(list)
 for c in combs:
     test_1=np.array(guideid_set)[list(c[0])]
@@ -1595,6 +1585,7 @@ size.to_csv("/home/yan/Projects/CRISPRi_related/doc/CRISPRi_manuscript/result/fi
     '''
 #%%
 '''
+##Table S2
 ### output the table to specify which guides for training and which for test in guide and gene-wise split
 '''
 from tqdm import tqdm
