@@ -125,13 +125,19 @@ def DataFrame_input(df,coding_strand=1):
     y=np.array(df['log2FC'],dtype=float)
     ### one hot encoded sequence features
     sequence_encoded=[]
+    numbers_dataset=len(set(df['dataset']))
     for i in df.index:
         sequence_encoded.append(self_encode(df['sequence_30nt'][i]))
         df.at[i,'guideid']=sequences.index(df['sequence'][i])
-    
+        for dataset in range(1,numbers_dataset): #dummy encode the dataset feature
+            if df['dataset'][i]==dataset:
+                df.at[i,'dataset_%s'%dataset]=1
+            else:
+                df.at[i,'dataset_%s'%dataset]=0
     guideids=np.array(list(df['guideid']))
+    dataset_col=np.array(df['dataset'],dtype=int)  
     # remove columns that are not used in training
-    drop_features=['Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
+    drop_features=['dataset','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality',
                    'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70','geneid','CRISPRoff_score','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
     for feature in drop_features:
@@ -140,13 +146,15 @@ def DataFrame_input(df,coding_strand=1):
         except KeyError:  
             pass
     X=df.drop(['log2FC'],1)
-    dataset_col=np.array(X['dataset'],dtype=int)  
+    
     headers=list(X.columns.values)
 
     X=X[headers]
     ### feat_type for auto sklearn
     feat_type=[]
-    categorical_indicator=['dataset']
+    categorical_indicator=["if_promoter"]
+    for j in range(1,numbers_dataset): #dummy encode the dataset feature
+        categorical_indicator.append('dataset_%s'%j)
     feat_type=['Categorical' if headers[i] in categorical_indicator else 'Numerical' for i in range(len(headers)) ] 
     ### add one-hot encoded sequence features columns
     sequence_encoded=np.array(sequence_encoded)

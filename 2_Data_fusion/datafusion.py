@@ -118,12 +118,6 @@ def DataFrame_input(df,coding_strand=1):
         df_gene=df[df['geneid']==i]
         for j in df_gene.index:
             df.at[j,'Nr_guide']=df_gene.shape[0]
-    # for dataset in range(len(set(df['dataset']))):
-    #     dataset_df=df[df['dataset']==dataset]
-    #     for i in list(set(dataset_df['geneid'])):
-    #         gene_df=dataset_df[dataset_df['geneid']==i]
-    #         for j in gene_df.index:
-    #             df.at[j,'Nr_guide']=gene_df.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
     df=df[df['Nr_guide']>=5]#keep only genes with more than 5 guides from all 3 datasets
     logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
@@ -131,27 +125,33 @@ def DataFrame_input(df,coding_strand=1):
     y=np.array(df['log2FC'],dtype=float)
     ### one hot encoded sequence features
     sequence_encoded=[]
+    numbers_dataset=len(set(df['dataset']))
     for i in df.index:
         sequence_encoded.append(self_encode(df['sequence_30nt'][i]))
         df.at[i,'geneid']=int(df['geneid'][i][1:])
         df.at[i,'guideid']=sequences.index(df['sequence'][i])
+        for dataset in range(1,numbers_dataset): #dummy encode the dataset feature
+            if df['dataset'][i]==dataset:
+                df.at[i,'dataset_%s'%dataset]=1
+            else:
+                df.at[i,'dataset_%s'%dataset]=0
     if split=='guide':
         guideids=np.array(list(df['guideid']))
     elif split=='gene':
         guideids=np.array(list(df['geneid']))
+    dataset_col=np.array(df['dataset'],dtype=int)  
     # remove columns that are not used in training
-    drop_features=['geneid','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
+    drop_features=['dataset','geneid','std','Nr_guide','coding_strand','guideid',"intergenic","No.","genename","gene_biotype","gene_strand","gene_5","gene_3",
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','sequence_30nt','gene_essentiality',
                    'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70',
                   'CRISPRoff_score','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
-    #,'MFE_hybrid_seed','MFE_homodimer_guide','MFE_hybrid_full','MFE_monomer_guide']
     for feature in drop_features:
         try:
             df=df.drop(feature,1)
         except KeyError:  
             pass
     X=df.drop(['log2FC'],1)
-    dataset_col=np.array(X['dataset'],dtype=int)  
+    
     headers=list(X.columns.values)
     ### add one-hot encoded sequence features columns
     sequence_encoded=np.array(sequence_encoded)
@@ -301,7 +301,7 @@ def main():
         from sklearn.ensemble import RandomForestRegressor
         estimator=RandomForestRegressor(random_state=np.random.seed(111))
     open(output_file_name + '/log.txt','a').write("Estimator:"+str(estimator)+"\n")
-    X_df=pandas.DataFrame(data=np.c_[X,y,guideids],columns=headers+['log2FC','guideid'])
+    X_df=pandas.DataFrame(data=np.c_[X,y,guideids,dataset_col],columns=headers+['log2FC','guideid','dataset'])
     #k-fold cross validation
     evaluations=defaultdict(list)
     kf=sklearn.model_selection.KFold(n_splits=folds, shuffle=True, random_state=np.random.seed(111))
@@ -315,29 +315,21 @@ def main():
         X_train=X_train[headers]
         X_train=X_train.astype(dtypes)
         
-        # from sklearn.preprocessing import StandardScaler
-        # scaler=StandardScaler()
-        # X_train=scaler.fit_transform(X_train)
-        
         test = X_df[X_df['guideid'].isin(test_index)]
         X_test=test[(test['dataset'].isin(training_sets))]
         y_test=X_test['log2FC']
         X_test=X_test[headers]
         X_test=X_test.astype(dtypes)
-        # X_test=scaler.transform(X_test)
     
         estimator = estimator.fit(np.array(X_train,dtype=float),np.array(y_train,dtype=float))
         predictions = estimator.predict(np.array(X_test,dtype=float))
-        # print(spearmanr(y_test, predictions,nan_policy='omit')[0])
         evaluations['Rs'].append(spearmanr(y_test, predictions)[0])
-        # Evaluation(output_file_name,y_test,predictions,"X_test_kfold")
         X_test_1=test[headers]
         #mixed datasets
         y_test_1=np.array(test['log2FC'],dtype=float)
         predictions=estimator.predict(np.array(X_test_1,dtype=float))
         spearman_rho,_=spearmanr(y_test_1, predictions)
         evaluations['Rs_test_mixed'].append(spearman_rho)
-        # Evaluation(output_file_name,y_test_1,predictions,"X_test_mixed")
         for dataset in range(len(datasets)):
             dataset1=test[test['dataset']==dataset]
             X_test_1=dataset1[headers]
@@ -345,7 +337,6 @@ def main():
             predictions=estimator.predict(np.array(X_test_1,dtype=float))
             spearman_rho,_=spearmanr(y_test_1, predictions)
             evaluations['Rs_test%s'%(dataset+1)].append(spearman_rho)
-            # Evaluation(output_file_name,y_test_1,predictions,"X_test_%s"%(dataset+1))
      
     evaluations=pandas.DataFrame.from_dict(evaluations)
     evaluations.to_csv(output_file_name+'/iteration_scores.csv',sep='\t',index=True)

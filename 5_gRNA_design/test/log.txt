@@ -1,7 +1,7 @@
-2023-01-13 10:18:08,883 - Python script: CRISPRi_design_MERF.py
+2023-03-29 15:26:31,279 - Python script: CRISPRi_design_MERF.py
 
-2023-01-13 10:18:08,887 - Parsed arguments: Namespace(PAM='NGG', biotype='all', fasta='test.fasta', gff=None, length=20, maxgc=85, mingc=30, output='test', shap='no', targeting_genes=None)
+2023-03-29 15:26:31,279 - Parsed arguments: Namespace(PAM='NGG', biotype='all', fasta='test.fasta', gff=None, if_promoter=None, length=20, maxgc=85, mingc=30, output='test', shap='no', targeting_genes=None)
 
-2023-01-13 10:18:08,891 - The number of gRNAs for test: 16
-2023-01-13 10:18:08,892 - The number of gRNAs for test2: 44
-2023-01-13 10:18:14,873 - Execution Time: 5.99 seconds
+2023-03-29 15:26:31,285 - The number of gRNAs for test: 16
+2023-03-29 15:26:31,286 - The number of gRNAs for test2: 44
+2023-03-29 15:26:37,066 - Execution Time: 6.69 seconds

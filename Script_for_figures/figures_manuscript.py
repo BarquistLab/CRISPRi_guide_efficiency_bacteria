@@ -335,16 +335,17 @@ dataset_labels= ['E75 Rousset','E18 Cui','Wang']
 training_labels={'R75':'E75 Rousset','C18':'E18 Cui','W': "Wang",
                     'R75W':'E75 Rousset & Wang','R75C18':'E75 Rousset & E18 Cui', 'C18W':'E18 Cui & Wang', '3sets': "3 datasets"}
 plot=defaultdict(list)
+output_dataset=defaultdict(list)
 for alg in algs:
     if alg=='MERF':
-        training_datasets=['R75','C18','W','R75W','3sets','3sets_deltaGB','3sets_dropdistance','3sets_CAI']
+        training_datasets=['R75','C18','W','3sets','3sets_deltaGB','3sets_dropdistance','3sets_CAI']
     elif alg in ['Pasteur']:
         training_datasets=['R75','C18','W','3sets']
     else:
         training_datasets=['3sets']
     for training_dataset in training_datasets:
         print(alg)
-        c1,c2,c3,c4=0,0,0,0
+        output_dataset[alg].append(training_dataset)
         if alg=='pasteur':
             df=pandas.read_csv("RF/3sets/iteration_predictions.csv",sep='\t')
         elif alg=='CNN' or alg=='CRISPRon' or alg=='CRISPRon_deltaGB':
@@ -373,7 +374,6 @@ for alg in algs:
             d['dataset']+=dataset
             D=pandas.DataFrame.from_dict(d)
             for k in range(3):
-                c=0
                 D_dataset=D[D['dataset']==k]
                 for j in list(set(D_dataset['geneid'])):
                     D_gene=D_dataset[D_dataset['geneid']==j]
@@ -394,10 +394,7 @@ plot_all=pandas.DataFrame.from_dict(plot)
 
 metrics=defaultdict(list)
 for alg in algs:
-    if alg=='MERF' :
-        training_datasets=['R75','C18','W','R75W','3sets','3sets_deltaGB','3sets_dropdistance','3sets_CAI']
-    elif alg in ['Pasteur']:
-        training_datasets=['R75','C18','W','3sets']
+    training_datasets=output_dataset[alg]
     for training_dataset in training_datasets:
         
         p=plot_all[(plot_all['training']==training_labels[training_dataset])&(plot_all['alg']==xticks[alg])]
@@ -464,14 +461,14 @@ https://tableconvert.com/excel-to-latex
         \multirow{3}{*}{\bfseries Model} & \multirow{3}{*}{\bfseries Training data} & \multicolumn{4}{c}{\bfseries Median Spearman Correlation} \\
         &  & \multicolumn{4}{c}{\bfseries Across held-out genes} \\ \cline{3-6}
          &  & \bfseries E75 Rousset & \bfseries E18 Cui & \bfseries Wang & \bfseries Mixed \\ \hline
-        \multirow{4}{*}{\bfseries MERF} & E75 Rousset & 0.331 & 0.333 & 0.257 & 0.301 \\ 
-         & E18 Cui & 0.371 & 0.400 & 0.283 & 0.329 \\ 
-         & Wang & 0.357 & 0.400 & 0.336 & 0.357 \\ 
-         & 3 datasets & \bfseries 0.406 & \bfseries 0.429 & \bfseries0.371 & \bfseries0.393 \\ \hline
+        \multirow{4}{*}{\bfseries MERF} & E75 Rousset & 0.327 & 0.287 & 0.279 & 0.296 \\ 
+         & E18 Cui & 0.391 & \bfseries 0.400 & 0.302 & 0.333 \\ 
+         & Wang & 0.373 & 0.367 & 0.327 & 0.344 \\ 
+         & 3 datasets & \bfseries 0.409 & \bfseries 0.400 & \bfseries0.373 & \bfseries0.396 \\ \hline
         \multirow{4}{*}{\bfseries Pasteur (retrained)} & E75 Rousset & 0.333 & 0.333 & 0.256 & 0.310 \\ 
         & E18 Cui & 0.363 & 0.352 & 0.286 & 0.322 \\ 
          & Wang & 0.367 & 0.377 & 0.307 & 0.339 \\ 
-         & 3 datasets & 0.394 & 0.400 & 0.327 & 0.366 \\ \hline
+         & 3 datasets & 0.394 & \bfseries 0.400 & 0.327 & 0.366 \\ \hline
     \end{tabular}}
     
 \end{table}
@@ -616,7 +613,7 @@ labels={'MERF':"MERF",
 '''
 ###Performance of deGFP
 '''
-df=pandas.read_csv("deGFP_gRNAs.csv",sep='\t')
+df=pandas.read_csv("deGFP_gRNAs.tsv",sep='\t')
 algs=['Pasteur','MERF']
 ecoli=list()
 salmonella=list()
@@ -780,7 +777,7 @@ for exp in ['ecoli','salmonella']:
 '''
 ### lacZ
 '''
-df=pandas.read_csv("lacZ_gRNAs.csv",sep='\t')
+df=pandas.read_csv("lacZ_gRNAs.tsv",sep='\t')
 algs=['Pasteur','MERF']
 tests=list()
 metric_scores=defaultdict(list)
@@ -951,7 +948,7 @@ plt.close()
 '''
 Purine screen
 '''
-df=pandas.read_csv("pur_gRNAs.csv",sep='\t')
+df=pandas.read_csv("pur_gRNAs.tsv",sep='\t')
 ###
 '''
 S6A

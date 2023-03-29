@@ -158,9 +158,9 @@ def DataFrame_input(df):
                    "genome_pos_5_end","genome_pos_3_end","guide_strand",'sequence','PAM','gene_essentiality',"geneid",
                    'off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70','CRISPRoff_score','spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening']
     if feature_set=='deltaGB':
-        drop_features=['std','nr_guides','median','guideid','log2FC',"intergenic","No.","genename","coding_strand",'geneid',
+        drop_features=['std','Nr_guide','guideid',"intergenic","No.","genename","coding_strand",'geneid',
                        "gene_biotype","gene_strand","gene_5","gene_3","genome_pos_5_end","genome_pos_3_end","guide_strand",
-                       'sequence','PAM','sequence_30nt','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70',
+                       'sequence','PAM','gene_essentiality','off_target_90_100','off_target_80_90',	'off_target_70_80','off_target_60_70',
                        'spacer_self_fold','RNA_DNA_eng','DNA_DNA_opening','MFE_hybrid_seed','MFE_homodimer_guide','MFE_hybrid_full','MFE_monomer_guide']
     for feature in drop_features:
         try:

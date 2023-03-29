@@ -39,8 +39,10 @@ It also supports to select multiple genes in a genome for design by input refere
 Example: python CRISPRi_design_MERF.py NC_000913.3.fasta -gff NC_000913.3.gff3 -targeting_genes purA,b1131 -shap no -o purs
                   """)
 parser.add_argument("fasta", help="fasta file")
-parser.add_argument("-gff", default=None,help="gff file")
+parser.add_argument("-gff", default=None,help="gff file. If no gff file is provided, the target genes are the sequences in fasta file.")
 parser.add_argument("-targeting_genes",default=None,help="gene name or gene ID of targeting genes (such as thrL, b0001), multiple genes separated by ','. If None, target all genes in gff file. Default: None")
+parser.add_argument("-if_promoter",default=None,help="whether the gene is the 1st gene in operon, multiple genes separated by ',' (such as 0, 1). Alternatively, a file with the string can be passed. If None, all genes are set to 0. Default: None")
+
 parser.add_argument("-o", "--output", default="results", help="output folder name. Default: results")
 parser.add_argument("-l","--length", type=int, default=20, help="Length of gRNA (bp). Default: 20")
 parser.add_argument("-maxgc", type=float, default=85, help="Maximal GC content of gRNA. Default: 85")
@@ -54,7 +56,17 @@ genome_gff=args.gff
 targeting_genes=args.targeting_genes
 if targeting_genes != None:
     targeting_genes=targeting_genes.split(",")
-        
+if_promoter=args.if_promoter
+if if_promoter != None:
+    try:
+        if_promoter=open(if_promoter,'r')
+        if_promoter=if_promoter.readlines()[0].stripe()
+    except:
+        pass
+    if_promoter=[int(i) for i in if_promoter.split(",")]
+    if targeting_genes!=None and len(if_promoter)!=len(targeting_genes):
+        print("the number of if_promoter is different from the number of target genes. Please check the parameters. -targeting_genes and -if_promoter")
+        sys.exist()
 output_file_name = args.output
 l=args.length
 maxgc = args.maxgc 
@@ -96,8 +108,10 @@ def ReferenceGenomeInfo(fasta,genome_gff):
             sys.exit()
         for fasta in fasta_sequences:  # input reference genome
             tasknames.update({fasta.id:fasta.seq })
+        if if_promoter != None and len(if_promoter)!=len(tasknames.keys()):
+            print("the number of if_promoter is different from the number of sequences in FASTA file.")
+            sys.exist()
         
-    
     if genome_gff != None:
         global reference_genes,reference_FASTA
         fasta_sequences = list(SeqIO.parse(open(fasta),'fasta'))
@@ -175,7 +189,7 @@ def gRNA_sequences(seq,l,mingc,maxgc,gene,reference_fasta,PAM,taskname):  ## seq
                         gRNA_ID='result_'+str(target_gene_pos+1)
                     else:
                         gRNA_ID=taskname+'_'+str(target_gene_pos+1)        
-                    guide.append({"SequenceID":gene['SequenceID'],"start":str(gene['start']),"end":str(gene['end']),"gene_strand":gene['strand'],"length":gene['length'],"gene_GC_content":gene["GC_content"],"gRNA_ID":gRNA_ID,"gene_pos":target_gene_pos,"genome_pos":target_genome_pos,"seq_20nt":str(gRNA_seq),"seq_full_length": gRNA_full_length_reverse,"PAM":gRNA_PAM,"gRNA_strand":strand,"gRNA_GC_content":'{:.2F}'.format(GC_content)})    
+                    guide.append({"SequenceID":gene['SequenceID'],"start":str(gene['start']),"end":str(gene['end']),"gene_strand":gene['strand'],"length":gene['length'],"gene_GC_content":gene["GC_content"],"gRNA_ID":gRNA_ID,"gene_pos":target_gene_pos,"genome_pos":target_genome_pos,"seq_20nt":str(gRNA_seq),"seq_full_length": gRNA_full_length_reverse,"PAM":gRNA_PAM,"gRNA_strand":strand,"gRNA_GC_content":'{:.2F}'.format(GC_content),'if_promoter':gene['if_promoter']})    
                                                     
             p=PAM_pos+1
         else:
@@ -193,15 +207,24 @@ def gRNA_search(targeting_genes):
                         genes.append(GENE)
         library_guides={}
         for gene in genes:
-            gene.update({'SequenceID':gene['gene_name']})
+            if if_promoter!=None:
+                promoter=if_promoter[genes.index(gene)]
+            else:
+                promoter=0
+            gene.update({'SequenceID':gene['gene_name'],'if_promoter':promoter})
             library_guides[gene['gene_name']+"_"+str(gene['start'])+"_"+str(gene['end'])]=gRNA_sequences(gene["seq_flanking"],l,mingc,maxgc,gene,reference_FASTA,PAM,gene['gene_name']+"_"+str(gene['start'])+"_"+str(gene['end']))  #gene["geneid"]+"_"+gene["start"] for pseudogenes with same locus tag and name but different position
             logging.info("The number of gRNAs for %s: %s"%(gene['gene_name'], len(library_guides[gene['gene_name']+"_"+str(gene['start'])+"_"+str(gene['end'])])))
             print("Done designing gRNAs for %s, number of gRNAs: %s"%(gene['gene_name'], len(library_guides[gene['gene_name']+"_"+str(gene['start'])+"_"+str(gene['end'])])))
     else:
         tasknames=targeting_genes
+            
         library_guides={}
         for taskname in tasknames.keys():
-            gene={'SequenceID':taskname,"start":1,"end":len(tasknames[taskname]),"strand":"+","length":len(tasknames[taskname]),"GC_content":float((tasknames[taskname].count('G') + tasknames[taskname].count('C'))) / len(tasknames[taskname]) * 100}
+            if if_promoter!=None:
+                promoter=if_promoter[list(tasknames.keys()).index(taskname)]
+            else:
+                promoter=0
+            gene={'SequenceID':taskname,"start":1,"end":len(tasknames[taskname]),"strand":"+","length":len(tasknames[taskname]),"GC_content":float((tasknames[taskname].count('G') + tasknames[taskname].count('C'))) / len(tasknames[taskname]) * 100,'if_promoter':promoter}
             library_guides[taskname]=gRNA_sequences("N"*20+tasknames[taskname],l,mingc,maxgc,gene,tasknames[taskname],PAM,taskname)
             logging.info("The number of gRNAs for %s: %s"%(taskname, len(library_guides[taskname])))
             print("Done designing gRNAs for %s, number of gRNAs: %s"%(taskname, len(library_guides[taskname])))
@@ -271,7 +294,7 @@ def MachineLearning(guides):
     guides_df=MachineLearning_Transform(guides)
     guides_df=MachineLearning_Predict(guides_df)
     guides_df["distance_start_codon"] += 1
-    chosen_header=["gRNA_ID","SequenceID","distance_start_codon","distance_start_codon_perc","guide_GC_content","coding_strand","seq_20nt","seq_full_length","PAM","predicted_log2FC","Warning"]
+    chosen_header=["gRNA_ID","SequenceID","distance_start_codon","distance_start_codon_perc","guide_GC_content","coding_strand","seq_20nt","seq_full_length","PAM","predicted_log2FC",'if_promoter',"Warning"]
     if l == 20:
         chosen_header.remove("seq_full_length")
     if all(guides_df['Warning']==""):
@@ -281,7 +304,7 @@ def MachineLearning(guides):
     guides_df=guides_df.round({"distance_start_codon_perc":2,"predicted_log2FC":4})
     guides_df=guides_df.rename(columns={"distance_start_codon":"Distance to start codon (bp)","distance_start_codon_perc":"Distance to start codon relative to the sequence length (%)",\
                                 "guide_GC_content":"GC content (%)","coding_strand":"coding strand","predicted_log2FC":"Activity score",\
-                                "seq_20nt":"gRNA sequence (20nt)"})
+                                "seq_20nt":"gRNA sequence (20nt)",'if_promoter':'whether 1st gene in operon'})
     if "seq_full_length" in guides_df.columns.values.tolist():
         guides_df=guides_df.rename(columns={"seq_full_length":"gRNA sequence with desired length"})
     guides_df=guides_df.sort_values(by="Activity score",ascending=True)

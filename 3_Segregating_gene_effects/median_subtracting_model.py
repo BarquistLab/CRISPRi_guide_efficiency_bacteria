@@ -133,7 +133,7 @@ def encode_seqarr(seq,r):
 def DataFrame_input(df):
     ###keep guides for essential genes
     logging_file= open(output_file_name + '/log.txt','a')
-    df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==1)]
+    df=df[(df['gene_essentiality']==1)&(df['intergenic']==0)&(df['coding_strand']==1)] #
     df=df.dropna()
     import statistics
     for dataset in range(len(datasets)):
@@ -142,12 +142,12 @@ def DataFrame_input(df):
             gene_df=dataset_df[dataset_df['geneid']==i]
             median=statistics.median(gene_df['log2FC'])
             for j in gene_df.index:
-                df.at[j,'median']=median
+                # df.at[j,'median']=median
                 df.at[j,'activity_score']=median-df['log2FC'][j]
-                df.at[j,'Nr_guide']=gene_df.shape[0]
+                # df.at[j,'Nr_guide']=gene_df.shape[0]
     logging_file.write("Number of guides for essential genes: %s \n" % df.shape[0])
     #keep only genes with more than 5 guides from each dataset
-    df=df[df['Nr_guide']>=5]
+    # df=df[df['Nr_guide']>=5]
     logging_file.write("Number of guides after filtering: %s \n" % df.shape[0])
 
     log2FC=np.array(df['log2FC'],dtype=float)
@@ -167,9 +167,9 @@ def DataFrame_input(df):
     
     genome_pos_5_ends=list(df['genome_pos_5_end'])
     genome_pos_3_ends=list(df['genome_pos_3_end'])
-    
+    coding_strands=list(df['coding_strand'])
     y=np.array(df['activity_score'],dtype=float)
-    median=np.array(df['median'],dtype=float)
+    # median=np.array(df['median'],dtype=float)
     dataset_col=np.array(df['dataset'],dtype=float)
     if feature_set !='pasteur':
         # remove columns that are not used in training
@@ -218,7 +218,7 @@ def DataFrame_input(df):
     logging_file.write('Number of features: %s\n'%len(headers))
     logging_file.write('Features: %s\n'%",".join(headers))
 
-    return X, y, headers,dataset_col,log2FC , guideids,sequences,geneids,distance_start_codons,genome_pos_5_ends,genome_pos_3_ends
+    return X, y, headers,dataset_col,log2FC , guideids,sequences,geneids,distance_start_codons,genome_pos_5_ends,genome_pos_3_ends,coding_strands
 
 
 def Evaluation(output_file_name,y,predictions,name):
@@ -382,11 +382,11 @@ def main():
     training_df = training_df.sample(frac=1,random_state=np.random.seed(111)).reset_index(drop=True)
     open(output_file_name + '/log.txt','a').write("Training dataset: %s\n"%training_set_list[tuple(training_sets)])
     #dropping unnecessary features and encode sequence features
-    X,y,headers,dataset_col,log2FC,guideids, sequences,geneids,distance_start_codons,genome_pos_5_ends,genome_pos_3_ends= DataFrame_input(training_df)
+    X,y,headers,dataset_col,log2FC,guideids, sequences,geneids,distance_start_codons,genome_pos_5_ends,genome_pos_3_ends,coding_strands= DataFrame_input(training_df)
     open(output_file_name + '/log.txt','a').write("Data input Time: %s seconds\n\n" %('{:.2f}'.format(time.time()-start_time)))  
     
-    X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,guideids,dataset_col,sequences,geneids,genome_pos_5_ends,genome_pos_3_ends],
-                                   columns=headers+['activity','log2FC','guideid','dataset','sequence','geneid',"genome_pos_5_end","genome_pos_3_end"])
+    X_df=pandas.DataFrame(data=np.c_[X,y,log2FC,guideids,dataset_col,sequences,geneids,genome_pos_5_ends,genome_pos_3_ends,coding_strands],
+                                   columns=headers+['activity','log2FC','guideid','dataset','sequence','geneid',"genome_pos_5_end","genome_pos_3_end",'coding_strand'])
     if split=='gene_dropdistance' or feature_set=='pasteur' or 'drop_distance' in feature_set:
         X_df=pandas.DataFrame(data=np.c_[X_df,distance_start_codons],columns=X_df.columns.values.tolist()+['distance_start_codon'])
     dtypes=dict()
@@ -469,6 +469,7 @@ def main():
         train_index = np.array(guideid_set)[train_index]
         test_index = np.array(guideid_set)[test_index]
         train = X_df[X_df['guideid'].isin(train_index)]
+        
         train=train[train['dataset'].isin(training_sets)]
         
         if len(training_sets)>1:
@@ -480,6 +481,7 @@ def main():
         X_train=np.array(X_train[headers])
         
         test = X_df[X_df['guideid'].isin(test_index)]
+        
         y_test=np.array(test['activity'])
         log2FC_test = np.array( test['log2FC'])
         X_test=np.array(test[headers])
@@ -516,6 +518,7 @@ def main():
     logging_file= open(output_file_name + '/log.txt','a')
     #save models trained with all samples
     X_all=X_df[X_df['dataset'].isin(training_sets)]
+    
     if len(training_sets)>1:
         plt.figure(figsize=(5,5))
         for i in range(3):

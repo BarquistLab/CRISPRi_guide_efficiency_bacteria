@@ -148,9 +148,16 @@ def main():
     Keio_essential_genes=['alaS', 'btuB', 'coaA', 'coaE', 'djlB', 'dnaG', 'folP', 'glmM', 'glyS', 'groL', 'hemE', 'ileS', 'lptB', 'parC', 'polA', 'prfB', 'priB', 'rho', 'rplK', 'rpoD', 'rpsU', 'tpr', 'yiaD', 'accA', 'accB', 'accC', 'accD', 'acpP', 'acpS', 'adk', 'alsK', 'argS', 'asd', 'asnS', 'aspS', 'bamA', 'bamD', 'bcsB', 'birA', 'can', 'cca', 'cdsA', 'chpS', 'coaD', 'csrA', 'cydA', 'cydC', 'cysS', 'dapA', 'dapB', 'dapD', 'dapE', 'def', 'degS', 'der', 'dfp', 'dicA', 'dnaA', 'dnaB', 'dnaC', 'dnaE', 'dnaN', 'dnaX', 'dut', 'dxr', 'dxs', 'eno', 'entD', 'era', 'erpA', 'fabA', 'fabB', 'fabD', 'fabG', 'fabI', 'fabZ', 'fbaA', 'ffh', 'fldA', 'fmt', 'folA', 'folC', 'folD', 'folE', 'folK', 'frr', 'ftsA', 'ftsB', 'ftsE', 'ftsH', 'ftsI', 'ftsK', 'ftsL', 'ftsN', 'ftsQ', 'ftsW', 'ftsX', 'ftsY', 'ftsZ', 'fusA', 'gapA', 'glmS', 'glmU', 'glnS', 'gltX', 'glyQ', 'gmk', 'gpsA', 'groS', 'grpE', 'gyrA', 'gyrB', 'hemA', 'hemB', 'hemC', 'hemD', 'hemG', 'hemH', 'hemL', 'hisS', 'holA', 'holB', 'igaA', 'infA', 'infB', 'infC', 'ispA', 'ispB', 'ispD', 'ispE', 'ispF', 'ispG', 'ispH', 'kdsA', 'kdsB', 'lepB', 'leuS', 'lexA', 'lgt', 'ligA', 'lnt', 'lolA', 'lolB', 'lolC', 'lolD', 'lolE', 'lptA', 'lptC', 'lptD', 'lptE', 'lptF', 'lptG', 'lpxA', 'lpxB', 'lpxC', 'lpxD', 'lpxH', 'lpxK', 'lspA', 'map', 'mazE', 'metG', 'metK', 'minD', 'minE', 'mlaB', 'mqsA', 'mraY', 'mrdA', 'mrdB', 'mreB', 'mreC', 'mreD', 'msbA', 'mukB', 'mukE', 'mukF', 'murA', 'murB', 'murC', 'murD', 'murE', 'murF', 'murG', 'murI', 'murJ', 'nadD', 'nadE', 'nadK', 'nrdA', 'nrdB', 'nusA', 'nusG', 'obgE', 'orn', 'parE', 'pgk', 'pgsA', 'pheS', 'pheT', 'plsB', 'plsC', 'ppa', 'prfA', 'prmC', 'proS', 'prs', 'psd', 'pssA', 'pth', 'purB', 'pyrG', 'pyrH', 'racR', 'ribA', 'ribB', 'ribC', 'ribD', 'ribE', 'ribF', 'rnc', 'rne', 'rnpA', 'rplB', 'rplC', 'rplD', 'rplE', 'rplF', 'rplJ', 'rplL', 'rplM', 'rplN', 'rplO', 'rplP', 'rplQ', 'rplR', 'rplS', 'rplT', 'rplU', 'rplV', 'rplW', 'rplX', 'rpmA', 'rpmB', 'rpmC', 'rpmD', 'rpmH', 'rpoA', 'rpoB', 'rpoC', 'rpoE', 'rpoH', 'rpsA', 'rpsB', 'rpsC', 'rpsD', 'rpsE', 'rpsG', 'rpsH', 'rpsJ', 'rpsK', 'rpsL', 'rpsN', 'rpsP', 'rpsR', 'rpsS', 'rseP', 'rsmI', 'secA', 'secD', 'secE', 'secF', 'secM', 'secY', 'serS', 'spoT', 'ssb', 'suhB', 'tadA', 'tdcF', 'thiL', 'thrS', 'tilS', 'tmk', 'topA', 'trmD', 'trpS', 'tsaB', 'tsaC', 'tsaD', 'tsaE', 'tsf', 'tyrS', 'ubiA', 'ubiB', 'ubiD', 'ubiV', 'uppS', 'valS', 'waaA', 'waaU', 'wzyE', 'yabQ', 'yafF', 'yagG', 'yceQ', 'ydfB', 'ydiL', 'yefM', 'yejM', 'yhhQ', 'yibJ', 'yidC', 'yihA', 'ymfK', 'yqgD', 'yqgF', 'zipA']
     ## import operons
     operons={}
+    genes_promoter=dict() ## get the if_promoter feature
     for line in open(operon_file):
         if "#" not in line:
             row=line.replace("\n","").split()
+            operon=row[5].split(",")
+            for g in operon:
+                if operon.index(g)==0:
+                    genes_promoter.update({g:1})
+                else:
+                    genes_promoter.update({g:0})
             if int(row[4])>1:
                 operons.update({row[0]:{"left":int(row[1]),"right":int(row[2]),"strand":row[3],"Genes_in_operon":row[5].split(",")}})
     ## import reference annotation
@@ -214,6 +221,8 @@ def main():
             continue
         else:
             gene=GFF[geneid]
+            
+        ### gene features
         library.at[i,'genename']=gene["genename"]
         library.at[i,'gene_biotype']=gene['biotype']
         library.at[i,'gene_essentiality']=gene['gene_essentiality']
@@ -229,12 +238,20 @@ def main():
         library.at[i,'operon_downstream_genes']=len(gene['operon_downstream_genes'])   
         library.at[i,'ess_gene_operon']=len(gene['ess_gene_operon'])
         
+        ### add if_promoter feature
+        if gene["genename"] in genes_promoter.keys():
+            library.at[i,'if_promoter']=genes_promoter[gene["genename"]]
+        else:
+            library.at[i,'if_promoter']=1
+        
         try:
             library.at[i,'gene_expression_min']=min(expression_levels.loc[geneid])
             library.at[i,'gene_expression_max']=max(expression_levels.loc[geneid])
         except KeyError:
             library.at[i,'gene_expression_min']=np.nan
-            library.at[i,'gene_expression_max']=np.nan            
+            library.at[i,'gene_expression_max']=np.nan         
+        
+        ### guide features
         target_seq=str(Seq(sequence).reverse_complement())
         library.at[i,'guide_GC_content']='{:.2f}'.format((sequence.count('G') + sequence.count('C')) / len(sequence) * 100)
         #"MFE_hybrid_full","MFE_hybrid_seed","MFE_mono_guide","MFE_dimer_guide"
