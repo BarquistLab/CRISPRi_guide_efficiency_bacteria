@@ -42,9 +42,9 @@ class MyParser(argparse.ArgumentParser):
         self.print_help()
         sys.exit(2)
 parser = MyParser(usage='python %(prog)s datasets [options]',formatter_class=argparse.RawTextHelpFormatter,description="""
-This is used to separate gene and guide effects using median subtracting method.
-
-Example: python median_subtracting_model.py -training 0,1,2 -c rf -o test
+This is used to separate gene and guide effects using Pasteur model or median subtracting method.
+To retrain the Pasteur model on our datasets, parameters -F pasteur and -c pasteur are required to specified.
+Example: python median_subtracting_model.py -training 0,1,2 -c pasteur -F pasteur -o test
                   """)
 parser.add_argument("-training", type=str, default='0,1,2', 
                     help="""
