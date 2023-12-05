@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/461471750.svg)](https://zenodo.org/doi/10.5281/zenodo.10262866)
 # CRISPRi_guide_efficiency_bacteria
 This repository contains datasets and Python scripts that were used in the study **"Improved prediction of bacterial CRISPRi guide efficiency from depletion screens through mixed-effect machine learning and data integration"**. *Each folder corresponds to a section of the paper.* 
 
